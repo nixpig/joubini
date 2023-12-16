@@ -1,0 +1,22 @@
+- servers:
+  localhost:
+    proxy:
+      # http://localhost -> http://localhost:3000
+      - :3000
+
+      # http://localhost/api -> http://localhost:3001/api
+      - api:3001/api
+
+      # http://localhost/admin -> http://localhost:3002/dashboard
+      - admin:3002/dashboard
+
+      # http://localhost/db -> http://localhost:5432
+      - db:5432
+
+    # defaults to http unless ssl provided below then auto-uses https
+    ssl:
+      cert: /path/to/public/cert.pem
+      key: /path/to/priv/key.pem
+
+    # upgrade to use web sockets?
+    wss: true
