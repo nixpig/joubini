@@ -6,6 +6,10 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ## Examples
 
+## Installation
+
+## Usage
+
 This is how I'd like it to work...either by CLI args or config file:
 
 ### CLI arguments
@@ -19,7 +23,7 @@ joubini
 	# http://localhost -> http://localhost:3000
 	-p | --proxy=:3000
 
-  # http://localhost/api -> http://localhost:3001/api
+	# http://localhost/api -> http://localhost:3001/api
 	-p | --proxy=api:3001/api
 
 	# http://localhost/admin -> http://localhost:3002/dashboard
@@ -28,7 +32,7 @@ joubini
 	# http://localhost/db -> http://localhost:5432
 	-p | --proxy=db:5432
 
-  # defaults to http unless ssl provided below then auto-uses https
+	# defaults to http unless ssl provided below then auto-uses https
 	-c | --ssl-cert="/path/to/public/cert.pem"
 	-k | --ssl-key="/path/to/priv/key.pem"
 
@@ -40,38 +44,45 @@ joubini
 ### Config file
 
 ```yaml
-- servers:
-  localhost:
-    proxy:
-      # http://localhost -> http://localhost:3000
-      - :3000
+# joubini.yml
 
-      # http://localhost/api -> http://localhost:3001/api
-      - api:3001/api
+- localhost:
+  proxy:
+    # http://localhost -> http://localhost:3000
+    - :3000
 
-      # http://localhost/admin -> http://localhost:3002/dashboard
-      - admin:3002/dashboard
+    # http://localhost/api -> http://localhost:3001/api
+    - api:3001/api
 
-      # http://localhost/db -> http://localhost:5432
-      - db:5432
+    # http://localhost/admin -> http://localhost:3002/dashboard
+    - admin:3002/dashboard
 
-    # defaults to http unless ssl provided below then auto-uses https
-    ssl:
-      cert: /path/to/public/cert.pem
-      key: /path/to/priv/key.pem
+    # http://localhost/db -> http://localhost:5432
+    - db:5432
 
-    # upgrade to use web sockets
-    wss: true
+  # defaults to http unless ssl provided below then auto-uses https
+  ssl:
+    cert: /path/to/public/cert.pem
+    key: /path/to/priv/key.pem
+
+  # upgrade to use web sockets
+  wss: true
 ```
-
-## Installation
-
-## Usage
 
 ## Motivation
 
+Just wanted an interesting little project to work on in Rust which involves some basic networking stuff and that would actually be useful.
+
 ## Alternatives
+
+- [Caddy](https://caddyserver.com/)
+- [NGINX](https://www.nginx.com/)
+- [Apache (httpd)](https://httpd.apache.org/)
 
 ## Contribute
 
+If there's any changes you want made, feel free to open an [issue](https://github.com/nixpig/joubini/issues).
+
 ## License
+
+[MIT](https://github.com/nixpig/joubini?tab=MIT-1-ov-file#readme)
