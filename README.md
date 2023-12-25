@@ -2,9 +2,9 @@
 
 A super-simple and minimally configurable reverse HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, SSL and web sockets.
 
-> ⚠️ WORK IN PROGRESS
+> ## ⚠️ WORK IN PROGRESS
 >
-> ## Features (aka `todo!()`, aka wishlist)
+> ### Features (aka `todo!()`, aka wishlist)
 >
 > - [ ] HTTP/1.1
 > - [ ] HTTP/2
