@@ -1,8 +1,15 @@
 # 🐙 joubini
 
-A super-simple and minimally configurable reverse HTTP reverse proxy for local development.
+A super-simple and minimally configurable reverse HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, SSL and web sockets.
 
 > ⚠️ WORK IN PROGRESS
+>
+> ## Features (aka `todo!()`, aka wishlist)
+>
+> [ ] HTTP/1.1
+> [ ] HTTP/2
+> [ ] SSL
+> [ ] Web sockets
 
 ## Examples
 
@@ -46,7 +53,7 @@ joubini
 ```yaml
 # joubini.yml
 
-- localhost:
+- hostname: localhost
   proxy:
     # http://localhost -> http://localhost:3000
     - :3000
@@ -82,6 +89,15 @@ Just wanted an interesting little project to work on in Rust which involves some
 ## Contribute
 
 If there's any changes you want made, feel free to open an [issue](https://github.com/nixpig/joubini/issues).
+
+### Development
+
+Grant access to ports lower than 1024.
+
+```shell
+cargo build && sudo setcap CAP_NET_BIND_SERVICE=+eip ./target/debug/joubini && ./target/debug/joubini
+
+```
 
 ## License
 
