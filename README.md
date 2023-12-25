@@ -6,10 +6,10 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 >
 > ## Features (aka `todo!()`, aka wishlist)
 >
-> [ ] HTTP/1.1
-> [ ] HTTP/2
-> [ ] SSL
-> [ ] Web sockets
+> - [ ] HTTP/1.1
+> - [ ] HTTP/2
+> - [ ] SSL
+> - [ ] Web sockets
 
 ## Examples
 
