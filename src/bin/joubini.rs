@@ -27,7 +27,7 @@ async fn main() {
 
     info!("Starting...");
 
-    let addr = "localhost:7878";
+    let addr = "127.0.0.1:7878";
 
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => {
@@ -81,64 +81,44 @@ async fn handle_connection(
 
     let request = request.join("\r\n");
 
-    let get = "GET /json HTTP/1.1\r\n";
     let sleep = "GET /sleep HTTP/1.1\r\n";
 
-    // let (status_line, contents) = if request.starts_with(get) {
-    if let Ok(mut remote_stream) =
-        TcpStream::connect("jsonplaceholder.typicode.com:80").await
-    {
-        println!("{:?}", remote_stream);
-        info!("[{uid}] Connected to jsonplaceholder");
-
-        info!("[{uid}] Writing to remote stream: ");
-
-        let replaced_request =
-            request.replace("localhost:7878", "jsonplaceholder.typicode.com");
-
-        info!("{:?}", std::str::from_utf8(replaced_request.as_bytes())?);
-        if remote_stream
-            .write_all(replaced_request.as_bytes())
-            .await
-            .is_err()
-        {
-            warn!("[{uid}] Unable to write to remote stream");
-        }
-
-        info!("[{uid}] Reading from remote stream");
-        let mut res = vec![];
-        match remote_stream.read_to_end(&mut res).await {
-            Ok(v) => println!("read"),
-            Err(e) => println!("{:?}", e),
-            // warn!("[{uid}] Unable to read from remote stream");
-        }
-
-        if remote_stream.flush().await.is_err() {
-            warn!("[{uid}] Unable to flush remote stream");
-        }
-
-        println!("read: {:#?}", std::str::from_utf8(&res)?);
-
-        if stream.write_all(&res).await.is_err() {
-            warn!("[{uid}] Unable to write to stream");
-        };
+    let (status_line, contents) = if request.starts_with(sleep) {
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        ("HTTP/1.1 200 OK\r\n\r\n", "Slept")
     } else {
-        warn!("[{uid}] Unable to connect to jsonplaceholder");
+        if let Ok(mut remote_stream) =
+            TcpStream::connect("jsonplaceholder.typicode.com:80").await
+        {
+            info!("[{uid}] Connected to jsonplaceholder");
+
+            println!("{:?}", request);
+
+            let mut request = request
+                .replace("localhost:7878", "jsonplaceholder.typicode.com");
+            request.push_str("\r\nConnection: close\r\n\r\n");
+
+            println!("replaced: {}", request);
+
+            remote_stream.write_all(request.as_bytes()).await?;
+
+            let mut res = vec![];
+            remote_stream.read_to_end(&mut res).await?;
+            println!("read: {:#?}", std::str::from_utf8(&res)?);
+
+            stream.write_all(&res).await?;
+        } else {
+            warn!("[{uid}] Unable to connect to jsonplaceholder");
+        }
+
+        ("HTTP/1.1 200 OK\r\n\r\n", "Hello, world!")
+    };
+
+    let response = format!("{status_line}{contents}");
+
+    if stream.write_all(response.as_bytes()).await.is_err() {
+        warn!("[{uid}] Unable to write to stream");
     }
-
-    // ("HTTP/1.1 200 OK\r\n\r\n", "Hello, world!")
-    // } else if request.starts_with(sleep) {
-    //     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-    //     ("HTTP/1.1 200 OK\r\n\r\n", "Slept")
-    // } else {
-    //     ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "Oops!")
-    // };
-
-    // let response = format!("{status_line}{contents}");
-
-    // if stream.write_all(response.as_bytes()).await.is_err() {
-    //     warn!("[{uid}] Unable to write to stream");
-    // }
 
     if stream.flush().await.is_err() {
         warn!("Unable to flush stream");
