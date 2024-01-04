@@ -4,6 +4,26 @@
       "id": 1,
       "title": "json-server",
       "author": "typicode"
+    },
+    {
+      "title": "new post",
+      "author": "nixpig",
+      "id": 2
+    },
+    {
+      "title": "new post",
+      "author": "nixpig",
+      "id": 3
+    },
+    {
+      "title": "new post",
+      "author": "nixpig",
+      "id": 4
+    },
+    {
+      "title": "new post",
+      "author": "nixpig",
+      "id": 5
     }
   ],
   "comments": [

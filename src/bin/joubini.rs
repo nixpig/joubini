@@ -7,7 +7,7 @@ use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 use tracing_subscriber::{
     filter::targets::Targets, layer::SubscriberExt, util::SubscriberInitExt,
 };
@@ -41,16 +41,6 @@ impl FromStr for Proxy {
         }
 
         Err(ProxyParseError)
-    }
-}
-
-impl Proxy {
-    fn new(local_path: String, remote_path: String, remote_port: u16) -> Self {
-        Proxy {
-            local_path,
-            remote_path,
-            remote_port,
-        }
     }
 }
 
@@ -89,8 +79,12 @@ async fn main() {
         }
     };
 
+    info!("starting loop...");
+
     loop {
         let uid = nanoid!(5);
+
+        info!("[{uid}] Listening for requests...");
 
         if let Ok(socket) = listener.accept().await {
             info!("[{uid}] Established TCP connection");
@@ -98,17 +92,12 @@ async fn main() {
             tokio::spawn(async move {
                 info!("[{uid}] Handling request");
 
-                let mut proxies = vec![];
-
-                proxies.push(
-                    Proxy::from_str("zero:3000/profile")
+                let proxies = vec![
+                    Proxy::from_str("zero:3000/posts")
                         .expect("should parse proxy from string"),
-                );
-
-                proxies.push(
                     Proxy::from_str("one:3001/comments")
                         .expect("should parse proxy from string"),
-                );
+                ];
 
                 let (stream, _) = socket;
 
@@ -123,7 +112,7 @@ async fn main() {
 }
 
 async fn handle_connection(
-    mut stream: TcpStream,
+    stream: TcpStream,
     proxies: Vec<Proxy>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
@@ -134,25 +123,24 @@ async fn handle_connection(
     let proxy_request = map_proxy_request(parsed_request, proxies).await?;
 
     let port = proxy_request.port;
-    let mut request_str = build_proxy_request(proxy_request)?;
+    let request_str = build_proxy_request(proxy_request)?;
 
     if let Ok(mut remote_stream) =
         TcpStream::connect(format!("localhost:{}", port)).await
     {
         info!("[{uid}] Connected to remote server");
 
-        request_str.push_str("\r\nConnection: close\r\n\r\n");
-        println!("request_str:\n{:#?}", request_str);
+        info!("[{uid}] Request string:\n{:#?}", request_str);
 
         remote_stream.write_all(request_str.as_bytes()).await?;
 
-        let mut res = vec![];
+        let mut response = vec![];
 
-        remote_stream.read_to_end(&mut res).await?;
+        remote_stream.read_to_end(&mut response).await?;
 
-        stream.write_all(&res).await?;
+        stream.write_all(&response).await?;
     } else {
-        info!("[{uid}] Unable to connect to remote server");
+        error!("[{uid}] Unable to connect to remote server");
     }
 
     Ok(())
@@ -274,8 +262,9 @@ fn build_proxy_request(request: Request) -> Result<String, Box<dyn Error>> {
 
     request_str.push_str(&headers);
 
+    request_str.push_str("\r\nConnection: close\r\n\r\n");
+
     if let Some(body) = request.body {
-        request_str.push_str("\r\n\r\n");
         request_str.push_str(&body);
     }
 
