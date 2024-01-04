@@ -19,24 +19,38 @@ struct Proxy {
     remote_port: u16,
 }
 
-impl Proxy {
-    fn new(proxy_config: String) -> Self {
-        if let Some((local, remote)) = proxy_config.split_once(':') {
+#[derive(Debug)]
+struct ProxyParseError;
+
+impl FromStr for Proxy {
+    type Err = ProxyParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((local, remote)) = s.split_once(':') {
             let (port, path) = if let Some((p1, p2)) = remote.split_once('/') {
                 (p1, p2)
             } else {
                 (remote, "")
             };
 
-            return Proxy {
+            return Ok(Proxy {
                 local_path: ["/", local].join(""),
                 remote_path: ["/", path].join(""),
                 remote_port: port.parse::<u16>().unwrap(),
-            };
+            });
         }
 
-        error!("Invalid configuration: '{proxy_config}'");
-        panic!();
+        Err(ProxyParseError)
+    }
+}
+
+impl Proxy {
+    fn new(local_path: String, remote_path: String, remote_port: u16) -> Self {
+        Proxy {
+            local_path,
+            remote_path,
+            remote_port,
+        }
     }
 }
 
@@ -84,14 +98,21 @@ async fn main() {
             tokio::spawn(async move {
                 info!("[{uid}] Handling request");
 
-                let mut proxies = HashMap::new();
+                let mut proxies = vec![];
 
-                proxies.insert("zero", (3000, ""));
-                proxies.insert("one", (3001, ""));
+                proxies.push(
+                    Proxy::from_str("zero:3000/profile")
+                        .expect("should parse proxy from string"),
+                );
+
+                proxies.push(
+                    Proxy::from_str("one:3001/comments")
+                        .expect("should parse proxy from string"),
+                );
 
                 let (stream, _) = socket;
 
-                if handle_connection(stream, &proxies, &uid).await.is_err() {
+                if handle_connection(stream, proxies, &uid).await.is_err() {
                     error!("[{uid}] Unable to handle connection");
                 }
             });
@@ -103,12 +124,18 @@ async fn main() {
 
 async fn handle_connection(
     stream: TcpStream,
-    proxies: &HashMap<&str, (i32, &str)>,
+    proxies: Vec<Proxy>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
-    let parsed_request = parse_incoming_request(stream);
+    info!("[{uid}] Parsing incoming request...");
+    let parsed_request = parse_incoming_request(stream).await?;
 
-    println!("parsed_request:\n{:#?}", parsed_request.await?);
+    info!("[{uid}] Mapping request to proxy request...");
+    let proxy_request = map_proxy_request(parsed_request, proxies).await?;
+
+    let request_str = build_proxy_request(proxy_request)?;
+
+    println!("request_str:\n{:#?}", request_str);
 
     Ok(())
 }
@@ -118,9 +145,8 @@ struct Request {
     http_method: String,
     http_version: String,
     path: String,
-    request_line: String,
-    request_headers: HashMap<String, String>,
-    request_body: Option<String>,
+    headers: HashMap<String, String>,
+    body: Option<String>,
 }
 
 impl Request {
@@ -129,9 +155,8 @@ impl Request {
             http_method: String::from(""),
             http_version: String::from(""),
             path: String::from(""),
-            request_line: String::from(""),
-            request_headers: HashMap::new(),
-            request_body: None,
+            headers: HashMap::new(),
+            body: None,
         }
     }
 }
@@ -143,9 +168,15 @@ async fn parse_incoming_request(
 
     let mut reader = BufReader::new(&mut incoming_request_stream);
 
-    reader.read_line(&mut request.request_line).await?;
+    let mut request_line = String::new();
 
-    println!("request_line: {}", request.request_line);
+    reader.read_line(&mut request_line).await?;
+
+    let request_line_parts: Vec<&str> = request_line.split(' ').collect();
+
+    request.http_method = String::from(request_line_parts[0].trim());
+    request.path = String::from(request_line_parts[1].trim());
+    request.http_version = String::from(request_line_parts[2].trim());
 
     loop {
         let mut header_line = String::new();
@@ -157,16 +188,14 @@ async fn parse_incoming_request(
         }
 
         if let Some((header_name, header_value)) = header_line.split_once(':') {
-            request.request_headers.insert(
+            request.headers.insert(
                 String::from(header_name.trim()),
                 String::from(header_value.trim()),
             );
         }
     }
 
-    if let Some(content_length) = request.request_headers.get("Content-Length")
-    {
-        println!("length: {content_length}");
+    if let Some(content_length) = request.headers.get("Content-Length") {
         let mut body_buffer = vec![
             0u8;
             content_length.parse::<usize>().expect(
@@ -176,11 +205,57 @@ async fn parse_incoming_request(
 
         reader.read_exact(&mut body_buffer).await?;
 
-        request.request_body = Some(String::from(
+        request.body = Some(String::from(
             std::str::from_utf8(&body_buffer)
                 .expect("body should be parsable to string"),
         ));
     }
 
     Ok(request)
+}
+
+async fn map_proxy_request(
+    mut request: Request,
+    proxies: Vec<Proxy>,
+) -> Result<Request, Box<dyn Error>> {
+    let proxy = proxies
+        .iter()
+        .find(|x| request.path.starts_with(&x.local_path))
+        .expect("should be a matching proxy for the request");
+
+    request.headers.insert(
+        String::from("Host"),
+        format!("localhost:{}", proxy.remote_port),
+    );
+
+    request.path = request.path.replace(&proxy.local_path, &proxy.remote_path);
+
+    Ok(request)
+}
+
+fn build_proxy_request(request: Request) -> Result<String, Box<dyn Error>> {
+    let mut request_str = String::new();
+
+    let request_line = format!(
+        "{} {} {}",
+        request.http_method, request.path, request.http_version
+    );
+    request_str.push_str(&request_line);
+    request_str.push_str("\r\n");
+
+    let headers = request
+        .headers
+        .iter()
+        .map(|(k, v)| format!("{}: {}", k, v))
+        .collect::<Vec<String>>()
+        .join("\r\n");
+
+    request_str.push_str(&headers);
+    request_str.push_str("\r\n\r\n");
+
+    if let Some(body) = request.body {
+        request_str.push_str(&body);
+    }
+
+    Ok(request_str)
 }
