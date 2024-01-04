@@ -7,7 +7,7 @@ use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
 };
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::{
     filter::targets::Targets, layer::SubscriberExt, util::SubscriberInitExt,
 };
@@ -64,13 +64,13 @@ async fn main() {
         .with(format_layer)
         .init();
 
-    info!("Starting...");
+    debug!("Starting...");
 
     let addr = "127.0.0.1:7878";
 
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => {
-            info!("Bound to address");
+            info!("Listening on: {addr}");
             l
         }
         Err(_) => {
@@ -79,23 +79,23 @@ async fn main() {
         }
     };
 
-    info!("starting loop...");
+    debug!("starting loop...");
 
     loop {
         let uid = nanoid!(5);
 
-        info!("[{uid}] Listening for requests...");
+        debug!("[{uid}] Listening for requests...");
 
         if let Ok(socket) = listener.accept().await {
-            info!("[{uid}] Established TCP connection");
+            debug!("[{uid}] Established TCP connection");
 
             tokio::spawn(async move {
-                info!("[{uid}] Handling request");
+                debug!("[{uid}] Handling request");
 
                 let proxies = vec![
                     Proxy::from_str("zero:3000/posts")
                         .expect("should parse proxy from string"),
-                    Proxy::from_str("one:3001/comments")
+                    Proxy::from_str("zero/one:3001/comments")
                         .expect("should parse proxy from string"),
                 ];
 
@@ -116,11 +116,17 @@ async fn handle_connection(
     proxies: Vec<Proxy>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
-    info!("[{uid}] Parsing incoming request...");
+    debug!("[{uid}] Parsing incoming request...");
     let (parsed_request, mut stream) = parse_incoming_request(stream).await?;
 
-    info!("[{uid}] Mapping request to proxy request...");
+    let local_path = parsed_request.path.clone();
+    let method = parsed_request.http_method.clone();
+
+    debug!("[{uid}] Mapping request to proxy request...");
     let proxy_request = map_proxy_request(parsed_request, proxies).await?;
+
+    let remote_port = proxy_request.port.clone();
+    let remote_path = proxy_request.path.clone();
 
     let port = proxy_request.port;
     let request_str = build_proxy_request(proxy_request)?;
@@ -128,16 +134,23 @@ async fn handle_connection(
     if let Ok(mut remote_stream) =
         TcpStream::connect(format!("localhost:{}", port)).await
     {
-        info!("[{uid}] Connected to remote server");
+        debug!("[{uid}] Connected to remote server");
 
-        info!("[{uid}] Request string:\n{:#?}", request_str);
+        debug!("[{uid}] Request string:\n{:#?}", request_str);
+
+        println!(
+            "[{uid}] {} {} => :{}{}",
+            method, local_path, remote_port, remote_path
+        );
 
         remote_stream.write_all(request_str.as_bytes()).await?;
 
         let mut response = vec![];
 
+        debug!("[{uid}] Reading from remote stream");
         remote_stream.read_to_end(&mut response).await?;
 
+        debug!("[{uid}] Writing to local stream");
         stream.write_all(&response).await?;
     } else {
         error!("[{uid}] Unable to connect to remote server");

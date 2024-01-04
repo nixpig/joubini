@@ -39,6 +39,9 @@ joubini
 	# http://localhost/db -> http://localhost:5432
 	-p | --proxy=db:5432
 
+	# http://localhost/deep -> http://localhost:3003/deep/nested/path
+	-p | --proxy=deep:3003/deep/nested/path
+
 	# defaults to http unless ssl provided below then auto-uses https
 	-c | --ssl-cert="/path/to/public/cert.pem"
 	-k | --ssl-key="/path/to/priv/key.pem"
@@ -92,10 +95,12 @@ If there's any changes you want made, feel free to open an [issue](https://githu
 
 ### Development
 
-Grant access to ports lower than 1024.
+In order to bind to port 80, you'll need to grant access to the binary to do so.
+
+Replace `$PATH_TO_PROJECT` in command below with the _absolute_ path to the project.
 
 ```shell
-cargo build && sudo setcap CAP_NET_BIND_SERVICE=+eip ./target/debug/joubini && ./target/debug/joubini
+sudo setcap CAP_NET_BIND_SERVICE=+eip $PATH_TO_PROJECT/target/debug/joubini \
 
 ```
 
