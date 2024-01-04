@@ -123,19 +123,37 @@ async fn main() {
 }
 
 async fn handle_connection(
-    stream: TcpStream,
+    mut stream: TcpStream,
     proxies: Vec<Proxy>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
     info!("[{uid}] Parsing incoming request...");
-    let parsed_request = parse_incoming_request(stream).await?;
+    let (parsed_request, mut stream) = parse_incoming_request(stream).await?;
 
     info!("[{uid}] Mapping request to proxy request...");
     let proxy_request = map_proxy_request(parsed_request, proxies).await?;
 
-    let request_str = build_proxy_request(proxy_request)?;
+    let port = proxy_request.port;
+    let mut request_str = build_proxy_request(proxy_request)?;
 
-    println!("request_str:\n{:#?}", request_str);
+    if let Ok(mut remote_stream) =
+        TcpStream::connect(format!("localhost:{}", port)).await
+    {
+        info!("[{uid}] Connected to remote server");
+
+        request_str.push_str("\r\nConnection: close\r\n\r\n");
+        println!("request_str:\n{:#?}", request_str);
+
+        remote_stream.write_all(request_str.as_bytes()).await?;
+
+        let mut res = vec![];
+
+        remote_stream.read_to_end(&mut res).await?;
+
+        stream.write_all(&res).await?;
+    } else {
+        info!("[{uid}] Unable to connect to remote server");
+    }
 
     Ok(())
 }
@@ -145,6 +163,7 @@ struct Request {
     http_method: String,
     http_version: String,
     path: String,
+    port: u16,
     headers: HashMap<String, String>,
     body: Option<String>,
 }
@@ -155,6 +174,7 @@ impl Request {
             http_method: String::from(""),
             http_version: String::from(""),
             path: String::from(""),
+            port: 80,
             headers: HashMap::new(),
             body: None,
         }
@@ -163,7 +183,7 @@ impl Request {
 
 async fn parse_incoming_request(
     mut incoming_request_stream: TcpStream,
-) -> Result<Request, Box<dyn Error>> {
+) -> Result<(Request, TcpStream), Box<dyn Error>> {
     let mut request = Request::new();
 
     let mut reader = BufReader::new(&mut incoming_request_stream);
@@ -211,7 +231,7 @@ async fn parse_incoming_request(
         ));
     }
 
-    Ok(request)
+    Ok((request, incoming_request_stream))
 }
 
 async fn map_proxy_request(
@@ -229,6 +249,8 @@ async fn map_proxy_request(
     );
 
     request.path = request.path.replace(&proxy.local_path, &proxy.remote_path);
+
+    request.port = proxy.remote_port;
 
     Ok(request)
 }
@@ -251,9 +273,9 @@ fn build_proxy_request(request: Request) -> Result<String, Box<dyn Error>> {
         .join("\r\n");
 
     request_str.push_str(&headers);
-    request_str.push_str("\r\n\r\n");
 
     if let Some(body) = request.body {
+        request_str.push_str("\r\n\r\n");
         request_str.push_str(&body);
     }
 
