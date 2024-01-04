@@ -102,60 +102,85 @@ async fn main() {
 }
 
 async fn handle_connection(
-    mut stream: TcpStream,
+    stream: TcpStream,
     proxies: &HashMap<&str, (i32, &str)>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
-    let mut buf_reader = BufReader::new(&mut stream);
+    let parsed_request = parse_incoming_request(stream);
 
-    let mut request_line = String::new();
-    buf_reader.read_line(&mut request_line).await?;
+    println!("parsed_request:\n{:#?}", parsed_request.await?);
 
-    let mut headers: HashMap<String, String> = HashMap::new();
-    while let Some(line) = buf_reader.lines().next_line().await? {
-        if line.is_empty() {
+    Ok(())
+}
+
+#[derive(Debug)]
+struct Request {
+    http_method: String,
+    http_version: String,
+    path: String,
+    request_line: String,
+    request_headers: HashMap<String, String>,
+    request_body: Option<String>,
+}
+
+impl Request {
+    fn new() -> Request {
+        Request {
+            http_method: String::from(""),
+            http_version: String::from(""),
+            path: String::from(""),
+            request_line: String::from(""),
+            request_headers: HashMap::new(),
+            request_body: None,
+        }
+    }
+}
+
+async fn parse_incoming_request(
+    mut incoming_request_stream: TcpStream,
+) -> Result<Request, Box<dyn Error>> {
+    let mut request = Request::new();
+
+    let mut reader = BufReader::new(&mut incoming_request_stream);
+
+    reader.read_line(&mut request.request_line).await?;
+
+    println!("request_line: {}", request.request_line);
+
+    loop {
+        let mut header_line = String::new();
+
+        reader.read_line(&mut header_line).await?;
+
+        if header_line.trim().is_empty() {
             break;
         }
 
-        let (header_name, header_value) = line
-            .split_once(':')
-            .expect("headers must have a name and a value");
-        headers.insert(
-            String::from(header_name.trim()),
-            String::from(header_value.trim()),
-        );
+        if let Some((header_name, header_value)) = header_line.split_once(':') {
+            request.request_headers.insert(
+                String::from(header_name.trim()),
+                String::from(header_value.trim()),
+            );
+        }
     }
 
-    let mut body: Vec<String> = vec![];
+    if let Some(content_length) = request.request_headers.get("Content-Length")
+    {
+        println!("length: {content_length}");
+        let mut body_buffer = vec![
+            0u8;
+            content_length.parse::<usize>().expect(
+                "content length should be parsable to an int"
+            )
+        ];
 
-    // let proxy_port = proxies[base].0;
-    //
-    // if let Ok(mut remote_stream) =
-    //     TcpStream::connect(format!("localhost:{}", proxy_port).as_str()).await
-    // {
-    //     info!("[{uid}] Connected to remote");
-    //
-    //     println!("{:?}", request);
-    //
-    //     let mut request = request.replace(
-    //         "localhost:7878",
-    //         format!("localhost:{}", proxy_port).as_str(),
-    //     );
-    //     request.push_str("\r\nConnection: close\r\n\r\n");
-    //
-    //     remote_stream.write_all(request.as_bytes()).await?;
-    //
-    //     let mut res = vec![];
-    //     remote_stream.read_to_end(&mut res).await?;
-    //
-    //     stream.write_all(&res).await?;
-    // } else {
-    //     warn!("[{uid}] Unable to connect to remote");
-    // };
-    //
-    // if stream.flush().await.is_err() {
-    //     warn!("Unable to flush stream");
-    // }
+        reader.read_exact(&mut body_buffer).await?;
 
-    Ok(())
+        request.request_body = Some(String::from(
+            std::str::from_utf8(&body_buffer)
+                .expect("body should be parsable to string"),
+        ));
+    }
+
+    Ok(request)
 }
