@@ -100,7 +100,7 @@ In order to bind to port 80, you'll need to grant access to the binary to do so.
 Replace `$PATH_TO_PROJECT` in command below with the _absolute_ path to the project.
 
 ```shell
-sudo setcap CAP_NET_BIND_SERVICE=+eip $PATH_TO_PROJECT/target/debug/joubini \
+sudo setcap CAP_NET_BIND_SERVICE=+eip $PATH_TO_PROJECT/target/debug/joubini
 
 ```
 

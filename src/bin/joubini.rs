@@ -1,7 +1,12 @@
+use clap::Parser;
+use joubini::cli::Cli;
+use joubini::proxy::Proxy;
+use joubini::settings::Settings;
 use nanoid::nanoid;
 use std::collections::HashMap;
 use std::error::Error;
 use std::str::FromStr;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::{
     io::AsyncWriteExt,
@@ -11,38 +16,6 @@ use tracing::{debug, error, info};
 use tracing_subscriber::{
     filter::targets::Targets, layer::SubscriberExt, util::SubscriberInitExt,
 };
-
-#[derive(Debug)]
-struct Proxy {
-    local_path: String,
-    remote_path: String,
-    remote_port: u16,
-}
-
-#[derive(Debug)]
-struct ProxyParseError;
-
-impl FromStr for Proxy {
-    type Err = ProxyParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some((local, remote)) = s.split_once(':') {
-            let (port, path) = if let Some((p1, p2)) = remote.split_once('/') {
-                (p1, p2)
-            } else {
-                (remote, "")
-            };
-
-            return Ok(Proxy {
-                local_path: ["/", local].join(""),
-                remote_path: ["/", path].join(""),
-                remote_port: port.parse::<u16>().unwrap(),
-            });
-        }
-
-        Err(ProxyParseError)
-    }
-}
 
 #[tokio::main]
 async fn main() {
@@ -64,9 +37,18 @@ async fn main() {
         .with(format_layer)
         .init();
 
+    debug!("Parsing CLI arguments");
+
+    let settings: Settings =
+        Cli::parse().try_into().expect("Unable to parse arguments");
+
+    println!("{:#?}", settings);
+
+    let proxies = Arc::new(settings.proxies);
+
     debug!("Starting...");
 
-    let addr = "127.0.0.1:7878";
+    let addr = format!("127.0.0.1:{}", settings.local_port);
 
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => {
@@ -89,20 +71,16 @@ async fn main() {
         if let Ok(socket) = listener.accept().await {
             debug!("[{uid}] Established TCP connection");
 
-            tokio::spawn(async move {
-                debug!("[{uid}] Handling request");
-
-                let proxies = vec![
-                    Proxy::from_str("zero:3000/posts")
-                        .expect("should parse proxy from string"),
-                    Proxy::from_str("zero/one:3001/comments")
-                        .expect("should parse proxy from string"),
-                ];
-
+            tokio::spawn({
+                let proxies = proxies.clone();
                 let (stream, _) = socket;
 
-                if handle_connection(stream, proxies, &uid).await.is_err() {
-                    error!("[{uid}] Unable to handle connection");
+                async move {
+                    debug!("[{uid}] Handling request");
+
+                    if handle_connection(stream, proxies, &uid).await.is_err() {
+                        error!("[{uid}] Unable to handle connection");
+                    }
                 }
             });
         } else {
@@ -113,7 +91,7 @@ async fn main() {
 
 async fn handle_connection(
     stream: TcpStream,
-    proxies: Vec<Proxy>,
+    proxies: Arc<Vec<Proxy>>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
     debug!("[{uid}] Parsing incoming request...");
@@ -125,7 +103,7 @@ async fn handle_connection(
     debug!("[{uid}] Mapping request to proxy request...");
     let proxy_request = map_proxy_request(parsed_request, proxies).await?;
 
-    let remote_port = proxy_request.port.clone();
+    let remote_port = proxy_request.port;
     let remote_path = proxy_request.path.clone();
 
     let port = proxy_request.port;
@@ -237,7 +215,7 @@ async fn parse_incoming_request(
 
 async fn map_proxy_request(
     mut request: Request,
-    proxies: Vec<Proxy>,
+    proxies: Arc<Vec<Proxy>>,
 ) -> Result<Request, Box<dyn Error>> {
     let proxy = proxies
         .iter()
