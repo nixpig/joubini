@@ -1,6 +1,7 @@
 use joubini::settings::get_settings;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tracing::debug;
 use tracing_subscriber::fmt::format::FmtSpan;
 
 #[tokio::main]
@@ -20,12 +21,16 @@ async fn main() {
 
     let settings = get_settings();
 
+    debug!("{:#?}", settings);
+
     let proxies = Arc::new(settings.proxies);
 
-    let listener =
-        TcpListener::bind(format!("127.0.0.1:{}", settings.local_port))
-            .await
-            .expect("Could not bind to port");
+    let listener = TcpListener::bind(format!(
+        "{}:{}",
+        settings.hostname, settings.local_port
+    ))
+    .await
+    .expect("Could not bind to port");
 
     loop {
         joubini::startup::run(&listener, proxies.clone())

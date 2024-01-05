@@ -6,7 +6,7 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 >
 > ### Features (aka `todo!()`, aka wishlist)
 >
-> - [ ] HTTP/1.1
+> - [x] HTTP/1.1
 > - [ ] HTTP/2
 > - [ ] SSL
 > - [ ] Web sockets
@@ -68,6 +68,16 @@ joubini
 	-u | --wss-upgrade=true
 
 ```
+
+> #### Note
+>
+> Ordering of proxy configurations matters.
+>
+> This (probably) **will not** work as intended:
+> `joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
+>
+> This (probably) **will** work as intended:
+> `joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
 ### Config file
 

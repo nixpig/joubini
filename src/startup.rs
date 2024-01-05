@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::{collections::HashMap, error::Error, net::SocketAddr, sync::Arc};
 
 use nanoid::nanoid;
 use tokio::{
@@ -22,10 +22,13 @@ pub async fn run(
     let handle = tokio::spawn({
         let uid = nanoid!(5);
         let proxies = proxies.clone();
-        let (stream, _) = socket;
+        let (stream, addr) = socket;
 
         async move {
-            if handle_connection(stream, proxies, &uid).await.is_err() {
+            if handle_connection(stream, addr, proxies, &uid)
+                .await
+                .is_err()
+            {
                 error!("[{uid}] Unable to handle connection");
             }
         }
@@ -36,6 +39,7 @@ pub async fn run(
 
 async fn handle_connection(
     stream: TcpStream,
+    addr: SocketAddr,
     proxies: Arc<Vec<Proxy>>,
     uid: &String,
 ) -> Result<(), Box<dyn Error>> {
@@ -54,9 +58,10 @@ async fn handle_connection(
     let port = proxy_request.port;
     let request_str = build_proxy_request(proxy_request)?;
 
-    if let Ok(mut remote_stream) =
-        TcpStream::connect(format!("localhost:{}", port)).await
-    {
+    let address = format!("{}:{}", addr.ip(), port);
+    debug!("address: {address}");
+
+    if let Ok(mut remote_stream) = TcpStream::connect(address).await {
         debug!("[{uid}] Connected to remote server");
 
         debug!("[{uid}] Request string:\n{:#?}", request_str);

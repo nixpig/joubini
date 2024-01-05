@@ -14,6 +14,15 @@ pub struct Cli {
     pub proxies: Vec<String>,
 
     #[clap(
+        short = 'n',
+        long = "hostname",
+        name = "hostname",
+        help = "Host to listen on.",
+        default_value = "localhost"
+    )]
+    pub hostname: String,
+
+    #[clap(
         short = 'P',
         long = "port",
         name = "port",

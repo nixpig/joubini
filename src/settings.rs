@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Settings {
+    pub hostname: String,
     pub local_port: u16,
     pub proxies: Vec<Proxy>,
 }
@@ -22,6 +23,7 @@ impl TryFrom<Cli> for Settings {
             .collect();
 
         Ok(Settings {
+            hostname: value.hostname,
             local_port: value.port,
             proxies,
         })
