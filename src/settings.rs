@@ -1,6 +1,6 @@
-use std::str::FromStr;
-
 use crate::{cli::Cli, proxy::Proxy};
+use clap::Parser;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Settings {
@@ -26,4 +26,8 @@ impl TryFrom<Cli> for Settings {
             proxies,
         })
     }
+}
+
+pub fn get_settings() -> Settings {
+    Cli::parse().try_into().expect("Unable to parse arguments")
 }
