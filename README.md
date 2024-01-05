@@ -11,6 +11,21 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 > - [ ] SSL
 > - [ ] Web sockets
 
+```shell
+$ joubini --help
+
+A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
+
+Usage: joubini [OPTIONS]
+
+Options:
+  -p, --proxy <proxy_config>  Configuration for proxy in format '<local_path>:<remote_port>/<remote_path>'
+  -P, --port <port>           Local port to listen on. [default: 80]
+  -h, --help                  Print help
+  -V, --version               Print version
+
+```
+
 ## Examples
 
 ## Installation
@@ -24,8 +39,11 @@ This is how I'd like it to work...either by CLI args or config file:
 ```shell
 joubini
 
-	# defaults to localhost unless another provided
+	# defaults to localhost if not specified
 	-n | --hostname=localhost
+
+	# defaults to 80 if not specified
+	-P | --port=7878
 
 	# http://localhost -> http://localhost:3000
 	-p | --proxy=:3000
