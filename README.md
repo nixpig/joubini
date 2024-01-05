@@ -36,6 +36,18 @@ This is how I'd like it to work...either by CLI args or config file:
 
 ### CLI arguments
 
+> #### Note:
+>
+> Ordering of proxy configurations matters.
+>
+> This (probably) **will not** work as intended:
+>
+> `joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
+>
+> This (probably) **will** work as intended:
+>
+> `joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
+
 ```shell
 joubini
 
@@ -68,16 +80,6 @@ joubini
 	-u | --wss-upgrade=true
 
 ```
-
-> #### Note
->
-> Ordering of proxy configurations matters.
->
-> This (probably) **will not** work as intended:
-> `joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
->
-> This (probably) **will** work as intended:
-> `joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
 ### Config file
 
