@@ -163,7 +163,7 @@ async fn test_deep_to_shallow_path_mapping() {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![Proxy::from_str("foo/bar/bax:3005/qux")
+        proxies: vec![Proxy::from_str("foo/bar/baz:3005/qux")
             .expect("Unable to parse proxy settings from provided string")],
     };
 
@@ -186,23 +186,67 @@ async fn test_deep_to_shallow_path_mapping() {
     assert_eq!(body, "get ok");
 }
 
-// #[tokio::test]
-// async fn test_deep_to_shallow_path_mapping() {
-//     Proxy::from_str("some/deep/path:3005")
-//         .expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
-// #[tokio::test]
-// async fn test_multiple_matching_path_mappings() {
-//     Proxy::from_str("myapp/api:3001/api")
-//         .expect("unable to parse proxy string");
-//     Proxy::from_str("myapp:3000/ui").expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
+#[serial]
+#[tokio::test]
+async fn test_nested_matching_path_mappings() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![
+            Proxy::from_str("foo/bar:3006/baz")
+                .expect("unable to parse proxy string"),
+            Proxy::from_str("foo/qux:3007/thud")
+                .expect("unable to parse proxy string"),
+            Proxy::from_str("foo:3008/fred")
+                .expect("unable to parse proxy string"),
+        ],
+    };
+
+    start_server(3006, "/baz").await;
+    start_server(3007, "/thud").await;
+    start_server(3008, "/fred").await;
+
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response_foo = client
+        .get("http://localhost:7878/foo")
+        .send()
+        .await
+        .expect("HTTP request failed");
+
+    let response_foo_bar = client
+        .get("http://localhost:7878/foo/bar")
+        .send()
+        .await
+        .expect("HTTP request failed");
+
+    let response_foo_qux = client
+        .get("http://localhost:7878/foo/qux")
+        .send()
+        .await
+        .expect("HTTP request failed");
+
+    let status_foo = response_foo.status();
+    let status_foo_bar = response_foo_bar.status();
+    let status_foo_qux = response_foo_qux.status();
+
+    let body_foo = response_foo.text().await.expect("Unable to get body");
+    let body_foo_bar =
+        response_foo_bar.text().await.expect("Unable to get body");
+    let body_foo_qux =
+        response_foo_qux.text().await.expect("Unable to get body");
+
+    assert_eq!(status_foo, StatusCode::OK);
+    assert_eq!(status_foo_bar, StatusCode::OK);
+    assert_eq!(status_foo_qux, StatusCode::OK);
+
+    assert_eq!(body_foo, "get ok");
+    assert_eq!(body_foo_bar, "get ok");
+    assert_eq!(body_foo_qux, "get ok");
+}
+
 // #[tokio::test]
 // async fn test_multiple_mappings() {
 //     Proxy::from_str(":3000").expect("unable to parse proxy string");
@@ -210,28 +254,6 @@ async fn test_deep_to_shallow_path_mapping() {
 //     todo!()
 // }
 //
-// #[tokio::test]
-// async fn test_app_start() {
-//     let settings = Settings {
-//         hostname: String::from("localhost"),
-//         local_port: 7878,
-//         proxies: vec![],
-//     };
-//
-//     start_joubini(settings).await;
-//
-//     let client = reqwest::Client::new();
-//
-//     let response = client
-//         .get("http://localhost:7878/zero")
-//         .send()
-//         .await
-//         .expect("Request did not complete successfully.");
-//
-//     println!("response: {:#?}", response);
-//
-//     assert_eq!(1, 2);
-// }
 
 // TODO: test different content types
 // TODO: test different HTTP verbs - POST, PUT, DELETE, etc...
@@ -282,7 +304,5 @@ struct Response {
 }
 
 async fn get_ok(data: actix_web::web::Data<&str>) -> HttpResponse {
-    println!("HANDLE OK");
-
     HttpResponse::Ok().body("get ok")
 }
