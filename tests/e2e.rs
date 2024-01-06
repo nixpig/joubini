@@ -1,4 +1,4 @@
-use std::{error::Error, str::FromStr, sync::Arc};
+use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
 use actix_web::{web, App, HttpResponse, HttpServer};
 use joubini::{proxy::Proxy, settings::Settings};
@@ -247,15 +247,92 @@ async fn test_nested_matching_path_mappings() {
     assert_eq!(body_foo_qux, "get ok");
 }
 
-// #[tokio::test]
-// async fn test_multiple_mappings() {
-//     Proxy::from_str(":3000").expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
+#[serial]
+#[tokio::test]
+async fn test_post_json() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![
+            Proxy::from_str(":3009").expect("Unable to parse proxy mapping")
+        ],
+    };
 
-// TODO: test different content types
+    start_server(3009, "/").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    #[derive(serde::Serialize)]
+    struct PostData {
+        data: String,
+    }
+
+    let post_data = PostData {
+        data: String::from("Some post data"),
+    };
+
+    let response = client
+        .post("http://localhost:7878/json-post")
+        .json(&post_data)
+        .send()
+        .await
+        .expect("HTTP POST request failed");
+
+    let status = response.status();
+
+    let body: Response =
+        response.json().await.expect("Unable to parse response");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        Response {
+            message: String::from("POST JSON OK")
+        }
+    );
+}
+
+#[serial]
+#[tokio::test]
+async fn test_post_form() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![
+            Proxy::from_str(":3010").expect("Unable to parse proxy config")
+        ],
+    };
+
+    start_server(3010, "/").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let mut form_data = HashMap::new();
+    form_data.insert("form_key", "form_value");
+
+    let response = client
+        .post("http://localhost:7878/form-post")
+        .form(&form_data)
+        .send()
+        .await
+        .expect("Unable to post form data");
+
+    let status = response.status();
+
+    let body: Response =
+        response.json().await.expect("Unable to get response body");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body,
+        Response {
+            message: String::from("POST FORM OK")
+        }
+    );
+}
+
 // TODO: test different HTTP verbs - POST, PUT, DELETE, etc...
 // TODO: test different responses - 200, 201, 302, 404, 500, etc...
 
@@ -284,12 +361,11 @@ async fn start_server(port: u16, path: &'static str) {
     let listener = std::net::TcpListener::bind(format!("localhost:{}", port))
         .expect("Unable to bind to port");
 
-    let data = actix_web::web::Data::new(path);
-
     let server = HttpServer::new(move || {
         App::new()
             .route(path, web::get().to(get_ok))
-            .app_data(data.clone())
+            .route("/json-post", web::post().to(post_json_ok))
+            .route("/form-post", web::post().to(post_form_ok))
     })
     .listen(listener)
     .expect("Unable to bind to listener")
@@ -298,11 +374,27 @@ async fn start_server(port: u16, path: &'static str) {
     tokio::spawn(server);
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 struct Response {
     message: String,
 }
 
-async fn get_ok(data: actix_web::web::Data<&str>) -> HttpResponse {
+async fn get_ok() -> HttpResponse {
     HttpResponse::Ok().body("get ok")
+}
+
+async fn post_json_ok() -> HttpResponse {
+    let json_ok = Response {
+        message: String::from("POST JSON OK"),
+    };
+
+    HttpResponse::Ok().json(json_ok)
+}
+
+async fn post_form_ok() -> HttpResponse {
+    let form_ok = Response {
+        message: String::from("POST FORM OK"),
+    };
+
+    HttpResponse::Ok().json(&form_ok)
 }
