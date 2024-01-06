@@ -4,10 +4,8 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 > ## ⚠️ WORK IN PROGRESS
 >
-> ### Features (aka `todo!()`, aka wishlist)
+> ### `todo!()`
 >
-> - [x] HTTP/1.1
-> - [ ] HTTP/2
 > - [ ] SSL
 > - [ ] Web sockets
 
@@ -30,13 +28,18 @@ Options:
 
 ## Installation
 
+### Build from source
+
+1. `git clone https://github.com/nixpig/joubini.git`
+1. `cd joubini`
+1. `cargo build --release`
+1. `mv ./target/release/joubini ~/.local/bin/`
+
 ## Usage
 
 This is how I'd like it to work...either by CLI args or config file:
 
-### CLI arguments
-
-#### Note
+### Note
 
 Ordering of proxy configurations matters.
 
@@ -46,13 +49,12 @@ Ordering of proxy configurations matters.
 ✅ This (probably) **will** work as intended:
 `joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
+### CLI arguments
+
 ```shell
 joubini
 
-	# defaults to localhost if not specified
-	-n | --hostname=localhost
-
-	# defaults to 80 if not specified
+	# defaults to 80 if not specified (see note below about granting access to ports below 1024)
 	-P | --port=7878
 
 	# http://localhost -> http://localhost:3000
@@ -69,13 +71,6 @@ joubini
 
 	# http://localhost/deep -> http://localhost:3003/deep/nested/path
 	-p | --proxy=deep:3003/deep/nested/path
-
-	# defaults to http unless ssl provided below then auto-uses https
-	-c | --ssl-cert="/path/to/public/cert.pem"
-	-k | --ssl-key="/path/to/priv/key.pem"
-
-	# upgrade to use web sockets
-	-u | --wss-upgrade=true
 
 ```
 
@@ -97,14 +92,6 @@ joubini
 
     # http://localhost/db -> http://localhost:5432
     - db:5432
-
-  # defaults to http unless ssl provided below then auto-uses https
-  ssl:
-    cert: /path/to/public/cert.pem
-    key: /path/to/priv/key.pem
-
-  # upgrade to use web sockets
-  wss: true
 ```
 
 ## Motivation
@@ -119,11 +106,11 @@ Just wanted an interesting little project to work on in Rust which involves some
 
 ## Contribute
 
-If there's any changes you want made, feel free to open an [issue](https://github.com/nixpig/joubini/issues).
+Any suggestions, feel free to open an [issue](https://github.com/nixpig/joubini/issues).
 
 ### Development
 
-In order to bind to port 80, you'll need to grant access to the binary to do so.
+In order to bind to port 80 (or any port below 1024), you'll need to grant access to the binary to do so.
 
 Replace `$PATH_TO_PROJECT` in command below with the _absolute_ path to the project.
 
