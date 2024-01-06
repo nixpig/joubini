@@ -72,7 +72,7 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
 
 #[serial]
 #[tokio::test]
-async fn test_path_to_path_mapping() {
+async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -97,11 +97,13 @@ async fn test_path_to_path_mapping() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, "get ok");
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_rename_path_mapping() {
+async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -126,11 +128,13 @@ async fn test_rename_path_mapping() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, "get ok");
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_shallow_to_deep_path_mapping() {
+async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -155,11 +159,13 @@ async fn test_shallow_to_deep_path_mapping() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, "get ok");
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_deep_to_shallow_path_mapping() {
+async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -184,11 +190,13 @@ async fn test_deep_to_shallow_path_mapping() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, "get ok");
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_nested_matching_path_mappings() {
+async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -245,11 +253,13 @@ async fn test_nested_matching_path_mappings() {
     assert_eq!(body_foo, "get ok");
     assert_eq!(body_foo_bar, "get ok");
     assert_eq!(body_foo_qux, "get ok");
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_post_json() {
+async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -291,11 +301,13 @@ async fn test_post_json() {
             message: String::from("POST JSON OK")
         }
     );
+
+    Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_post_form() {
+async fn test_post_form() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         hostname: String::from("localhost"),
         local_port: 7878,
@@ -331,6 +343,8 @@ async fn test_post_form() {
             message: String::from("POST FORM OK")
         }
     );
+
+    Ok(())
 }
 
 // TODO: test different HTTP verbs - POST, PUT, DELETE, etc...

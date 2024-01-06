@@ -2,7 +2,7 @@ use crate::{cli::Cli, proxy::Proxy};
 use clap::Parser;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Settings {
     pub hostname: String,
     pub local_port: u16,
