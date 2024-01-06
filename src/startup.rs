@@ -11,18 +11,17 @@ use tracing::{debug, debug_span, error, info};
 use crate::proxy::Proxy;
 
 pub async fn run(
-    listener: &TcpListener,
+    listener: Arc<TcpListener>,
     proxies: Arc<Vec<Proxy>>,
-) -> Result<JoinHandle<()>, Box<dyn Error>> {
-    let socket = listener
-        .accept()
-        .await
-        .expect("Unable to establish TCP connection");
-
+) -> Result<JoinHandle<()>, std::io::Error> {
     let handle = tokio::spawn({
+        let (stream, addr) = listener
+            .accept()
+            .await
+            .expect("Unable to establish TCP connection");
+
         let uid = nanoid!(5);
         let proxies = proxies.clone();
-        let (stream, addr) = socket;
 
         async move {
             if handle_connection(stream, addr, proxies, &uid)
@@ -169,6 +168,8 @@ async fn map_proxy_request(
     mut request: Request,
     proxies: Arc<Vec<Proxy>>,
 ) -> Result<Request, Box<dyn Error>> {
+    println!("proxies to match: {:#?}", proxies);
+
     let proxy = proxies
         .iter()
         .find(|x| request.path.starts_with(&x.local_path))
