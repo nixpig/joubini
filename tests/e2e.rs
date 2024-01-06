@@ -13,7 +13,7 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
         hostname: String::from("localhost"),
         local_port: 7878,
         proxies: vec![
-            Proxy::from_str("api:3000").expect("unable to parse proxy string")
+            Proxy::from_str(":3000").expect("Unable to parse proxy string")
         ],
     };
 
@@ -23,7 +23,7 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://localhost:7878/api")
+        .get("http://localhost:7878")
         .send()
         .await
         .expect("Request failed");
@@ -45,7 +45,7 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
         hostname: String::from("localhost"),
         local_port: 7878,
         proxies: vec![
-            Proxy::from_str("foo:3001").expect("unable to parse proxy string")
+            Proxy::from_str("foo:3001").expect("Unable to parse proxy string")
         ],
     };
 
@@ -70,29 +70,122 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// #[tokio::test]
-// async fn test_rename_path_mapping() {
-//     Proxy::from_str("admin:3002/dashboard")
-//         .expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
-// #[tokio::test]
-// async fn test_port_to_path_mapping() {
-//     Proxy::from_str("db:3003").expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
-// #[tokio::test]
-// async fn test_shallow_to_deep_path_mapping() {
-//     Proxy::from_str("shallow:3004/some/deep/path")
-//         .expect("unable to parse proxy string");
-//
-//     todo!()
-// }
-//
+#[serial]
+#[tokio::test]
+async fn test_path_to_path_mapping() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![Proxy::from_str("bar:3002/bar")
+            .expect("Unable to parse proxy string")],
+    };
+
+    start_server(3002, "/bar").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("http://localhost:7878/bar")
+        .send()
+        .await
+        .expect("HTTP request failed");
+
+    let status = response.status();
+
+    let body = response.text().await.expect("Unable to get response body");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, "get ok");
+}
+
+#[serial]
+#[tokio::test]
+async fn test_rename_path_mapping() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![Proxy::from_str("baz:3003/qux")
+            .expect("Unable to parse proxy string")],
+    };
+
+    start_server(3003, "/qux").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("http://localhost:7878/baz")
+        .send()
+        .await
+        .expect("HTTP request failed");
+
+    let status = response.status();
+
+    let body = response.text().await.expect("Unable to get response body");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, "get ok");
+}
+
+#[serial]
+#[tokio::test]
+async fn test_shallow_to_deep_path_mapping() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![Proxy::from_str("foo:3004/bar/baz/qux")
+            .expect("Unable to parse proxy config from string")],
+    };
+
+    start_server(3004, "/bar/baz/qux").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("http://localhost:7878/foo")
+        .send()
+        .await
+        .expect("Unable to make HTTP request");
+
+    let status = response.status();
+
+    let body = response.text().await.expect("Unable to get response body");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, "get ok");
+}
+
+#[serial]
+#[tokio::test]
+async fn test_deep_to_shallow_path_mapping() {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![Proxy::from_str("foo/bar/bax:3005/qux")
+            .expect("Unable to parse proxy settings from provided string")],
+    };
+
+    start_server(3005, "/qux").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("http://localhost:7878/foo/bar/baz")
+        .send()
+        .await
+        .expect("Failed to send HTTP request");
+
+    let status = response.status();
+
+    let body = response.text().await.expect("Could not get response body");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, "get ok");
+}
+
 // #[tokio::test]
 // async fn test_deep_to_shallow_path_mapping() {
 //     Proxy::from_str("some/deep/path:3005")
@@ -189,7 +282,7 @@ struct Response {
 }
 
 async fn get_ok(data: actix_web::web::Data<&str>) -> HttpResponse {
-    println!("WEB DATA: {:?}", data);
+    println!("HANDLE OK");
 
     HttpResponse::Ok().body("get ok")
 }

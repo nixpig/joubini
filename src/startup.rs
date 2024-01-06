@@ -168,8 +168,6 @@ async fn map_proxy_request(
     mut request: Request,
     proxies: Arc<Vec<Proxy>>,
 ) -> Result<Request, Box<dyn Error>> {
-    println!("proxies to match: {:#?}", proxies);
-
     let proxy = proxies
         .iter()
         .find(|x| request.path.starts_with(&x.local_path))
