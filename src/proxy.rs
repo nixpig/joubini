@@ -1,4 +1,27 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
+
+#[derive(Debug)]
+pub struct Request {
+    pub http_method: String,
+    pub http_version: String,
+    pub path: String,
+    pub port: u16,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
+}
+
+impl Request {
+    pub fn new() -> Request {
+        Request {
+            http_method: String::from(""),
+            http_version: String::from(""),
+            path: String::from(""),
+            port: 80,
+            headers: HashMap::new(),
+            body: None,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Proxy {
