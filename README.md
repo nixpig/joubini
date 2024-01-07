@@ -1,4 +1,5 @@
 [![Coverage Status](https://coveralls.io/repos/github/nixpig/joubini/badge.svg?branch=main)](https://coveralls.io/github/nixpig/joubini?branch=main)
+![Workflow Status](https://github.com/nixpig/joubini/actions/workflows/general.yml/badge.svg?branch=main)
 
 # 🐙 joubini
 
