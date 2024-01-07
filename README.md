@@ -9,6 +9,8 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 **It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
 
+## Features
+
 ```shell
 $ joubini --help
 
