@@ -12,6 +12,12 @@ pub struct Request {
 
 impl Request {
     pub fn new() -> Request {
+        Request::default()
+    }
+}
+
+impl Default for Request {
+    fn default() -> Self {
         Request {
             http_method: String::from(""),
             http_version: String::from(""),
