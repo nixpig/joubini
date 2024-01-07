@@ -74,13 +74,16 @@ async fn handle_connection(
 
         remote_stream.write_all(request_str.as_bytes()).await?;
 
-        let mut response = vec![];
+        let mut response = String::new();
 
         debug!("[{uid}] Reading from remote stream");
-        remote_stream.read_to_end(&mut response).await?;
+        remote_stream
+            .read_to_string(&mut response)
+            .await
+            .expect("Unable to read from remote stream");
 
         debug!("[{uid}] Writing to local stream");
-        stream.write_all(&response).await?;
+        stream.write_all(response.as_bytes()).await?;
     } else {
         error!("[{uid}] Unable to connect to remote server");
     }
@@ -139,13 +142,13 @@ async fn parse_incoming_request(
 
         if let Some((header_name, header_value)) = header_line.split_once(':') {
             request.headers.insert(
-                String::from(header_name.trim()),
+                String::from(header_name.to_lowercase().trim()),
                 String::from(header_value.trim()),
             );
         }
     }
 
-    if let Some(content_length) = request.headers.get("Content-Length") {
+    if let Some(content_length) = request.headers.get("content-length") {
         let mut body_buffer = vec![
             0u8;
             content_length.parse::<usize>().expect(
@@ -172,11 +175,6 @@ async fn map_proxy_request(
         .iter()
         .find(|x| request.path.starts_with(&x.local_path))
         .expect("should be a matching proxy for the request");
-
-    request.headers.insert(
-        String::from("Host"),
-        format!("localhost:{}", proxy.remote_port),
-    );
 
     request.path = request.path.replace(&proxy.local_path, &proxy.remote_path);
 

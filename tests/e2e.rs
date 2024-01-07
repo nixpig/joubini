@@ -6,6 +6,38 @@ use reqwest::StatusCode;
 use serial_test::serial;
 use tokio::net::TcpListener;
 
+#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+struct ResponseData {
+    message: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct PostData {
+    data: String,
+}
+
+#[serial]
+#[tokio::test]
+async fn test_fail_when_no_server() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        hostname: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![
+            Proxy::from_str(":3000").expect("Unable to parse proxy config")
+        ],
+    };
+
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client.get("/").send().await;
+
+    assert!(response.is_err());
+
+    Ok(())
+}
+
 #[serial]
 #[tokio::test]
 async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
@@ -273,11 +305,6 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
 
     let client = reqwest::Client::new();
 
-    #[derive(serde::Serialize)]
-    struct PostData {
-        data: String,
-    }
-
     let post_data = PostData {
         data: String::from("Some post data"),
     };
@@ -290,14 +317,14 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
         .expect("HTTP POST request failed");
 
     let status = response.status();
+    assert_eq!(status, StatusCode::OK);
 
-    let body: Response =
+    let body: ResponseData =
         response.json().await.expect("Unable to parse response");
 
-    assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body,
-        Response {
+        ResponseData {
             message: String::from("POST JSON OK")
         }
     );
@@ -333,13 +360,13 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
 
     let status = response.status();
 
-    let body: Response =
+    let body: ResponseData =
         response.json().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body,
-        Response {
+        ResponseData {
             message: String::from("POST FORM OK")
         }
     );
@@ -388,25 +415,26 @@ async fn start_server(port: u16, path: &'static str) {
     tokio::spawn(server);
 }
 
-#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
-struct Response {
-    message: String,
-}
-
 async fn get_ok() -> HttpResponse {
     HttpResponse::Ok().body("get ok")
 }
 
-async fn post_json_ok() -> HttpResponse {
-    let json_ok = Response {
-        message: String::from("POST JSON OK"),
-    };
+async fn post_json_ok(body: web::Json<PostData>) -> HttpResponse {
+    if body.data == "Some post data" {
+        let json_ok = ResponseData {
+            message: String::from("POST JSON OK"),
+        };
 
-    HttpResponse::Ok().json(json_ok)
+        HttpResponse::Ok().json(json_ok)
+    } else {
+        println!("Forwarded body data does not match provided body data");
+
+        HttpResponse::InternalServerError().into()
+    }
 }
 
 async fn post_form_ok() -> HttpResponse {
-    let form_ok = Response {
+    let form_ok = ResponseData {
         message: String::from("POST FORM OK"),
     };
 
