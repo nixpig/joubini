@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/nixpig/joubini/badge.svg?branch=main)](https://coveralls.io/github/nixpig/joubini?branch=main)
+
 # 🐙 joubini
 
 A super-simple and minimally configurable reverse HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.

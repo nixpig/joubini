@@ -13,6 +13,7 @@ env:
 
 jobs:
   build:
+    environment: Production
     runs-on: ubuntu-latest
 
     steps:
@@ -37,7 +38,6 @@ jobs:
         run: |
           cargo install cargo-tarpaulin \
           && cargo tarpaulin \
-            --verbose \
             --workspace \
             --no-fail-fast \
             --coveralls "$COVERALLS_REPO_TOKEN"
