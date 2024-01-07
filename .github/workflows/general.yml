@@ -24,7 +24,8 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Lint
         run: cargo clippy -- -D warnings
@@ -34,7 +35,7 @@ jobs:
 
       - name: Test
         run: |
-          cargo install tarpaulin \
+          cargo install cargo-tarpaulin \
           && cargo tarpaulin \
             --verbose \
             --workspace \
