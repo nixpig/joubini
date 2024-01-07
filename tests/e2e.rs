@@ -16,6 +16,11 @@ struct PostData {
     data: String,
 }
 
+#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+struct FormData {
+    form_key: String,
+}
+
 #[serial]
 #[tokio::test]
 async fn test_fail_when_no_server() -> Result<(), Box<dyn Error>> {
@@ -433,10 +438,18 @@ async fn post_json_ok(body: web::Json<PostData>) -> HttpResponse {
     }
 }
 
-async fn post_form_ok() -> HttpResponse {
-    let form_ok = ResponseData {
-        message: String::from("POST FORM OK"),
-    };
+async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
+    let expected_form_data = web::Form(FormData {
+        form_key: String::from("form_value"),
+    });
 
-    HttpResponse::Ok().json(&form_ok)
+    if form == expected_form_data {
+        let form_ok = ResponseData {
+            message: String::from("POST FORM OK"),
+        };
+
+        HttpResponse::Ok().json(&form_ok)
+    } else {
+        HttpResponse::InternalServerError().into()
+    }
 }
