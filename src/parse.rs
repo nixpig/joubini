@@ -39,6 +39,10 @@ pub async fn parse_incoming_request(
                 String::from(header_value.trim()),
             );
         }
+
+        request
+            .headers
+            .insert(String::from("host"), String::from("localhost:3000"));
     }
 
     if let Some(content_length) = request.headers.get("content-length") {

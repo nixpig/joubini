@@ -52,8 +52,10 @@ async fn handle_connection(
 
     let port = proxy_request.port;
     let request_str = build_proxy_request(proxy_request)?;
+    println!("request_str: {}", request_str);
 
     let address = format!("{}:{}", addr.ip(), port);
+    println!("address: {}", address);
 
     if let Ok(mut remote_stream) = TcpStream::connect(address).await {
         let log = format!(
@@ -64,14 +66,16 @@ async fn handle_connection(
 
         remote_stream.write_all(request_str.as_bytes()).await?;
 
-        let mut response = String::new();
+        let mut response = vec![];
 
         remote_stream
-            .read_to_string(&mut response)
+            .read_buf(&mut response)
             .await
             .expect("Unable to read from remote stream");
 
-        stream.write_all(response.as_bytes()).await?;
+        let response_bytes: &[u8] = &response;
+
+        stream.write_all(response_bytes).await?;
     } else {
         eprintln!("Unable to connect to remote server");
     }
