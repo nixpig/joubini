@@ -42,19 +42,13 @@ pub async fn parse_incoming_request(
     }
 
     if let Some(content_length) = request.headers.get("content-length") {
-        let mut body_buffer = vec![
-            0u8;
-            content_length.parse::<usize>().expect(
-                "content length should be parsable to an int"
-            )
-        ];
+        let mut body_buffer =
+            vec![0u8; content_length.parse::<usize>().unwrap()];
 
         reader.read_exact(&mut body_buffer).await?;
 
-        request.body = Some(String::from(
-            std::str::from_utf8(&body_buffer)
-                .expect("body should be parsable to string"),
-        ));
+        request.body =
+            Some(String::from(std::str::from_utf8(&body_buffer).unwrap()));
     }
 
     Ok((request, incoming_request_stream))
