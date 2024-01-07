@@ -5,12 +5,9 @@
 
 A super-simple and minimally configurable reverse HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
 
-> ## ⚠️ WORK IN PROGRESS
->
-> ### `todo!()`
->
-> - [ ] SSL
-> - [ ] Web sockets
+## ⚠️ WORK IN PROGRESS
+
+**It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
 
 ```shell
 $ joubini --help
