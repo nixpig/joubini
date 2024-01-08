@@ -81,8 +81,7 @@ joubini
 ```yaml
 # joubini.yml
 
-- hostname: localhost
-  proxy:
+- proxies:
     # http://localhost -> http://localhost:3000
     - :3000
 

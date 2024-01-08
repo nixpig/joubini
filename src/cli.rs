@@ -9,25 +9,7 @@ pub struct Cli {
         short = 'p',
         long = "proxy",
         name = "proxy_config",
-        help = "Configuration for proxy in format '<local_path>:<remote_port>/<remote_path>'"
+        help = "Configuration for proxy in format '<:local_port?></local_path?><:remote_port!></remote_path?>'"
     )]
     pub proxies: Vec<String>,
-
-    #[clap(
-        short = 'n',
-        long = "hostname",
-        name = "hostname",
-        help = "Host to listen on.",
-        default_value = "localhost"
-    )]
-    pub hostname: String,
-
-    #[clap(
-        short = 'P',
-        long = "port",
-        name = "port",
-        help = "Local port to listen on.",
-        default_value = "80"
-    )]
-    pub port: u16,
 }
