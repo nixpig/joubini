@@ -1,8 +1,11 @@
-use joubini::settings::get_settings;
+use std::error::Error;
+
+use joubini::{server::start, settings::get_settings};
 
 #[tokio::main]
-async fn main() {
-    println!("\n");
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let settings = get_settings();
-    println!("count: {}", settings.proxies.len());
+    println!("{:#?}", settings);
+
+    start(settings).await
 }

@@ -47,11 +47,6 @@ impl FromStr for ProxyConfig {
                 (remote, "")
             };
 
-            println!("local_path: {local_path}");
-            println!("remote_port: {remote_port}");
-            println!("remote_path: {remote_path}");
-            println!("---");
-
             Ok(ProxyConfig {
                 local_path: ["/", local_path].join(""),
                 remote_port: remote_port.parse::<u16>().unwrap(),

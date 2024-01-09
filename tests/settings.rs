@@ -2,9 +2,8 @@ use std::{error::Error, path::PathBuf, str::FromStr};
 
 use joubini::{
     cli::Cli,
-    settings::{self, ProxyConfig, Settings},
+    settings::{ProxyConfig, Settings},
 };
-use reqwest::Proxy;
 
 #[test]
 fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
