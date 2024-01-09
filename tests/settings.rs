@@ -1,6 +1,10 @@
-use std::{error::Error, str::FromStr};
+use std::{error::Error, path::PathBuf, str::FromStr};
 
-use joubini::settings::ProxyConfig;
+use joubini::{
+    cli::Cli,
+    settings::{self, ProxyConfig, Settings},
+};
+use reqwest::Proxy;
 
 #[test]
 fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
@@ -72,17 +76,151 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn test_parse_settings_from_config_file() -> Result<(), Box<dyn Error>> {
+    let settings_file_path = PathBuf::from_str("tests/config.yml").unwrap();
+
+    let settings = Settings::try_from(settings_file_path).unwrap();
+
+    assert_eq!(
+        settings,
+        Settings {
+            proxies: vec![
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/local/v1"),
+                    remote_port: 3000,
+                    remote_path: String::from("/remote/v1"),
+                }
+            ]
+        }
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_parse_settings_from_cli_arguments() -> Result<(), Box<dyn Error>> {
+    let config = Cli {
+        proxies: vec![
+            String::from(":3000"),
+            String::from(":3000/api"),
+            String::from("api:3000"),
+            String::from("api:3000/api"),
+            String::from("local/v1:3000/remote/v1"),
+        ],
+    };
+
+    let settings: Settings = config.try_into().unwrap();
+
+    assert_eq!(
+        settings,
+        Settings {
+            proxies: vec![
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/local/v1"),
+                    remote_port: 3000,
+                    remote_path: String::from("/remote/v1"),
+                }
+            ]
+        }
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
+    let mut settings_1 = Settings {
+        proxies: vec![ProxyConfig {
+            local_path: String::from("/local_one"),
+            remote_port: 3001,
+            remote_path: String::from("/remote_one"),
+        }],
+    };
+
+    let mut settings_2 = Settings {
+        proxies: vec![ProxyConfig {
+            local_path: String::from("/local_two"),
+            remote_port: 3002,
+            remote_path: String::from("/remote_two"),
+        }],
+    };
+
+    let merged_settings = settings_1.merge(&mut settings_2);
+
+    assert_eq!(
+        merged_settings,
+        Settings {
+            proxies: vec![
+                ProxyConfig {
+                    local_path: String::from("/local_one"),
+                    remote_port: 3001,
+                    remote_path: String::from("/remote_one"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/local_two"),
+                    remote_port: 3002,
+                    remote_path: String::from("/remote_two"),
+                },
+            ]
+        }
+    );
+
+    Ok(())
+}
+
 // #[test]
-// fn test_parse_settings_from_config_file() -> Result<(), Box<dyn Error>> {
+// fn test_get_settings() -> Result<(), Box<dyn Error>> {
 //     todo!()
 // }
-//
-// #[test]
-// fn test_parse_settings_from_cli_arguments() -> Result<(), Box<dyn Error>> {
-//     todo!()
-// }
-//
-// #[test]
-// fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
-//     todo!()
-// }
+
+#[test]
+fn test_create_empty_settings() -> Result<(), Box<dyn Error>> {
+    let new_settings = Settings::new();
+    assert_eq!(new_settings, Settings { proxies: vec![] });
+
+    let default_settings = Settings::default();
+    assert_eq!(default_settings, Settings { proxies: vec![] });
+
+    Ok(())
+}

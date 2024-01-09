@@ -2,17 +2,17 @@ use crate::cli::Cli;
 use clap::Parser;
 use std::{fs, path::PathBuf, str::FromStr};
 
-#[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
+#[derive(Default, Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
     pub proxies: Vec<ProxyConfig>,
 }
 
 impl Settings {
-    fn new() -> Settings {
-        Settings { proxies: vec![] }
+    pub fn new() -> Settings {
+        Settings::default()
     }
 
-    fn merge(&mut self, other: &mut Settings) -> Settings {
+    pub fn merge(&mut self, other: &mut Settings) -> Settings {
         let mut proxies: Vec<ProxyConfig> = vec![];
 
         proxies.append(&mut self.proxies);
