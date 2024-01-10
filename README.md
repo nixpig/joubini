@@ -46,10 +46,10 @@ This is how I'd like it to work...either by CLI args or config file:
 Ordering of proxy configurations matters.
 
 ❌ This (probably) **will not** work as intended:
-`joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
+`joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
 ✅ This (probably) **will** work as intended:
-`joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
+`joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
 
 ### CLI arguments
 

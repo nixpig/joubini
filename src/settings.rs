@@ -2,14 +2,27 @@ use crate::cli::Cli;
 use clap::Parser;
 use std::{fs, path::PathBuf, str::FromStr};
 
-#[derive(Default, Ord, Eq, PartialOrd, Debug, PartialEq)]
+#[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
+    pub local_port: Option<u16>,
     pub proxies: Vec<ProxyConfig>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            local_port: Some(80),
+            proxies: vec![],
+        }
+    }
 }
 
 impl Settings {
     pub fn new() -> Settings {
-        Settings::default()
+        Settings {
+            local_port: None,
+            proxies: vec![],
+        }
     }
 
     pub fn merge(&mut self, other: &mut Settings) -> Settings {
@@ -18,7 +31,18 @@ impl Settings {
         proxies.append(&mut self.proxies);
         proxies.append(&mut other.proxies);
 
-        Settings { proxies }
+        let local_port = match self.local_port {
+            Some(v) => Some(v),
+            None => match other.local_port {
+                Some(v) => Some(v),
+                None => panic!(),
+            },
+        };
+
+        Settings {
+            local_port,
+            proxies,
+        }
     }
 }
 
@@ -71,12 +95,16 @@ impl TryFrom<Cli> for Settings {
             .map(|p| ProxyConfig::from_str(p).unwrap())
             .collect();
 
-        Ok(Settings { proxies })
+        Ok(Settings {
+            local_port: Some(value.local_port),
+            proxies,
+        })
     }
 }
 
 #[derive(Debug, serde::Deserialize)]
 struct ConfigFileProxies {
+    local_port: Option<u16>,
     proxies: Vec<String>,
 }
 impl TryFrom<PathBuf> for Settings {
@@ -93,7 +121,10 @@ impl TryFrom<PathBuf> for Settings {
             .map(|p| ProxyConfig::from_str(p).unwrap())
             .collect();
 
-        Ok(Settings { proxies })
+        Ok(Settings {
+            local_port: config_yaml.local_port,
+            proxies,
+        })
     }
 }
 

@@ -6,6 +6,15 @@
 )]
 pub struct Cli {
     #[clap(
+        short = 'P',
+        long = "port",
+        name = "local_port",
+        help = "Local port for reverse proxy server to listen on",
+        default_value = "80"
+    )]
+    pub local_port: u16,
+
+    #[clap(
         short = 'p',
         long = "proxy",
         name = "proxy_config",
