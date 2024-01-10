@@ -5,7 +5,7 @@ use hyper::{
     Uri,
 };
 use lazy_static::lazy_static;
-use std::{error::Error, net::SocketAddr, sync::Arc};
+use std::{error::Error, sync::Arc};
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -46,15 +46,19 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, hyper::Error> {
+    println!("proxies: {:#?}", settings.proxies);
+    println!("req uri: {}", req.uri());
     let proxy = settings
         .proxies
         .iter()
-        .rfind(|x| x.local_path.starts_with(req.uri().to_string().as_str()))
-        .unwrap();
+        .rfind(|x| req.uri().to_string().starts_with(&x.local_path))
+        .expect("Unable to unwrap proxy configs");
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], proxy.remote_port));
+    println!("try to connect to: {}", proxy.remote_port);
+    let addr = format!("127.0.0.1:{}", proxy.remote_port);
 
     let stream = TcpStream::connect(addr).await.unwrap();
+    println!("connected to: {}", proxy.remote_port);
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
@@ -115,6 +119,8 @@ pub fn build_request(
         .unwrap();
 
     *req.uri_mut() = mapped_uri;
+
+    println!("mapped request: {:#?}", req);
 
     Ok(req)
 }
