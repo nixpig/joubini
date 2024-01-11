@@ -13,7 +13,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .with_span_events(FmtSpan::CLOSE)
         .init();
 
-    let settings = Arc::new(get_settings());
+    let settings = get_settings();
+
+    let settings = Arc::new(settings.unwrap());
 
     let listener = Arc::new(
         TcpListener::bind(format!("{}:{}", settings.host, settings.local_port))

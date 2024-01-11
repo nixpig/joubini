@@ -1,4 +1,5 @@
 use crate::cli::Cli;
+use crate::error::Error;
 use clap::Parser;
 use std::{fs, path::PathBuf, str::FromStr};
 
@@ -45,11 +46,8 @@ pub struct ProxyConfig {
     pub remote_path: String,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct ProxyConfigParseError;
-
 impl FromStr for ProxyConfig {
-    type Err = ProxyConfigParseError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((local_path, remote)) = s.split_once(':') {
@@ -63,35 +61,47 @@ impl FromStr for ProxyConfig {
                 (remote, "")
             };
 
-            Ok(ProxyConfig {
-                local_path: ["/", local_path].join(""),
-                remote_port: remote_port.parse::<u16>().unwrap(),
-                remote_path: ["/", remote_path].join(""),
-            })
+            if let Ok(remote_port) = remote_port.parse::<u16>() {
+                Ok(ProxyConfig {
+                    local_path: ["/", local_path].join(""),
+                    remote_port,
+                    remote_path: ["/", remote_path].join(""),
+                })
+            } else {
+                Err(Error::ProxyConfigParseError(format!(
+                    "'{}' is not a valid port number.",
+                    remote_port
+                )))
+            }
         } else {
-            Err(ProxyConfigParseError)
+            Err(Error::ProxyConfigParseError(format!(
+                "Colon (:) prefix for remote port definition missing in proxy config: '{}'",
+                s
+            )))
         }
     }
 }
 
-#[derive(Debug)]
-pub struct SettingsParseError;
-
 impl TryFrom<Cli> for Settings {
-    type Error = SettingsParseError;
+    type Error = Error;
 
     fn try_from(value: Cli) -> Result<Self, Self::Error> {
-        let proxies = value
+        match value
             .proxies
             .iter()
-            .map(|p| ProxyConfig::from_str(p).unwrap())
-            .collect();
-
-        Ok(Settings {
-            host: value.host,
-            local_port: value.local_port,
-            proxies,
-        })
+            .map(|p| ProxyConfig::from_str(p))
+            .collect::<Result<Vec<ProxyConfig>, Error>>()
+        {
+            Ok(proxies) => Ok(Settings {
+                host: value.host,
+                local_port: value.local_port,
+                proxies,
+            }),
+            Err(e) => Err(Error::SettingsParseError(format!(
+                "Unable to parse settings: {}",
+                e
+            ))),
+        }
     }
 }
 
@@ -113,34 +123,41 @@ struct ConfigFileProxies {
 
     proxies: Vec<String>,
 }
+
 impl TryFrom<PathBuf> for Settings {
-    type Error = SettingsParseError;
+    type Error = Error;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
         let config_str = fs::read_to_string(path).unwrap();
         let config_yaml: ConfigFileProxies =
             serde_yaml::from_str(&config_str).unwrap();
 
-        let proxies = config_yaml
+        match config_yaml
             .proxies
             .iter()
-            .map(|p| ProxyConfig::from_str(p).unwrap())
-            .collect();
-
-        Ok(Settings {
-            host: config_yaml.host,
-            local_port: config_yaml.local_port,
-            proxies,
-        })
+            .map(|p| ProxyConfig::from_str(p))
+            .collect::<Result<Vec<ProxyConfig>, Error>>()
+        {
+            Ok(proxies) => Ok(Settings {
+                host: config_yaml.host,
+                local_port: config_yaml.local_port,
+                proxies,
+            }),
+            Err(e) => Err(Error::SettingsParseError(format!(
+                "Unable to parse settings: {}",
+                e
+            ))),
+        }
     }
 }
 
-pub fn get_settings() -> Settings {
-    let mut cli_settings = Cli::parse().try_into().unwrap();
+pub fn get_settings() -> Result<Settings, Error> {
+    let mut cli_settings = Cli::parse().try_into()?;
+
     let mut file_settings =
         Settings::try_from(PathBuf::from_str("config.yml").unwrap()).unwrap();
 
-    Settings::new()
+    Ok(Settings::new()
         .merge(&mut file_settings)
-        .merge(&mut cli_settings)
+        .merge(&mut cli_settings))
 }

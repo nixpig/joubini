@@ -1,11 +1,14 @@
-use crate::settings::{ProxyConfig, Settings};
+use crate::{
+    error::Error,
+    settings::{ProxyConfig, Settings},
+};
 use hyper::{
     client::conn::http1::SendRequest,
     header::{HeaderName, HeaderValue},
     HeaderMap, Uri,
 };
 use lazy_static::lazy_static;
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 use tracing::{error, info};
 
 lazy_static! {
@@ -21,7 +24,7 @@ use tokio::net::{TcpListener, TcpStream};
 pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Listening on: {}", listener.local_addr().unwrap());
 
     loop {
@@ -94,7 +97,7 @@ pub fn build_request(
     host: &str,
     local_port: u16,
     proxy: &ProxyConfig,
-) -> Result<Request<Incoming>, hyper::Error> {
+) -> Result<Request<Incoming>, Error> {
     let local_addr = build_addr(host, local_port);
     let remote_addr = build_addr(host, proxy.remote_port);
 
@@ -102,9 +105,16 @@ pub fn build_request(
     add_x_forwarded_for_header(req.headers_mut(), &local_addr);
     add_host_header(req.headers_mut(), &remote_addr);
 
-    *req.uri_mut() = map_proxy_uri(req.uri(), proxy);
-
-    Ok(req)
+    match map_proxy_uri(req.uri(), proxy) {
+        Ok(v) => {
+            *req.uri_mut() = v;
+            Ok(req)
+        }
+        Err(e) => Err(Error::RequestBuildError(format!(
+            "URI mapping failed: {}",
+            e
+        ))),
+    }
 }
 
 pub async fn send_request(
@@ -158,13 +168,16 @@ fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
     proxies
         .iter()
         .rfind(|x| req_uri.starts_with(&x.local_path))
-        .expect("Unable to unwrap proxy configs")
+        .expect("Unable to find proxy config")
 }
 
-fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Uri {
-    req_uri
+fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
+    match req_uri
         .to_string()
         .replace(&proxy.local_path, &proxy.remote_path)
         .parse()
-        .unwrap()
+    {
+        Ok(v) => Ok(v),
+        Err(e) => Err(Error::ProxyUriMapError(e)),
+    }
 }
