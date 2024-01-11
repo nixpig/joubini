@@ -4,14 +4,16 @@ use std::{fs, path::PathBuf, str::FromStr};
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
-    pub local_port: Option<u16>,
+    pub host: String,
+    pub local_port: u16,
     pub proxies: Vec<ProxyConfig>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            local_port: Some(80),
+            host: String::from("localhost"),
+            local_port: 80,
             proxies: vec![],
         }
     }
@@ -19,10 +21,7 @@ impl Default for Settings {
 
 impl Settings {
     pub fn new() -> Settings {
-        Settings {
-            local_port: None,
-            proxies: vec![],
-        }
+        Settings::default()
     }
 
     pub fn merge(&mut self, other: &mut Settings) -> Settings {
@@ -31,16 +30,9 @@ impl Settings {
         proxies.append(&mut self.proxies);
         proxies.append(&mut other.proxies);
 
-        let local_port = match self.local_port {
-            Some(v) => Some(v),
-            None => match other.local_port {
-                Some(v) => Some(v),
-                None => panic!(),
-            },
-        };
-
         Settings {
-            local_port,
+            host: other.host.clone(),
+            local_port: other.local_port,
             proxies,
         }
     }
@@ -96,15 +88,29 @@ impl TryFrom<Cli> for Settings {
             .collect();
 
         Ok(Settings {
-            local_port: Some(value.local_port),
+            host: value.host,
+            local_port: value.local_port,
             proxies,
         })
     }
 }
 
+fn default_host() -> String {
+    String::from("localhost")
+}
+
+fn default_port() -> u16 {
+    80
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct ConfigFileProxies {
-    local_port: Option<u16>,
+    #[serde(default = "default_host")]
+    host: String,
+
+    #[serde(default = "default_port")]
+    local_port: u16,
+
     proxies: Vec<String>,
 }
 impl TryFrom<PathBuf> for Settings {
@@ -122,6 +128,7 @@ impl TryFrom<PathBuf> for Settings {
             .collect();
 
         Ok(Settings {
+            host: config_yaml.host,
             local_port: config_yaml.local_port,
             proxies,
         })
@@ -134,6 +141,6 @@ pub fn get_settings() -> Settings {
         Settings::try_from(PathBuf::from_str("config.yml").unwrap()).unwrap();
 
     Settings::new()
-        .merge(&mut cli_settings)
         .merge(&mut file_settings)
+        .merge(&mut cli_settings)
 }

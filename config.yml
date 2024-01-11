@@ -1,8 +1,3 @@
 proxies:
   - "zero:3000/comments"
   - "one:3001/posts"
-
-  - ":3000"
-  - ":3000/api"
-  - "api:3000"
-  - "api:3000/api"

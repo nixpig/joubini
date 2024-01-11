@@ -28,7 +28,8 @@ struct FormData {
 #[tokio::test]
 async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3009").unwrap()],
     };
 
@@ -42,7 +43,7 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
     };
 
     let response = client
-        .post("http://127.0.0.1:7878/json-post")
+        .post("http://localhost:7878/json-post")
         .json(&post_data)
         .send()
         .await
@@ -68,7 +69,8 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_post_form() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
     };
 
@@ -81,7 +83,7 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
     form_data.insert("form_key", "form_value");
 
     let response = client
-        .post("http://127.0.0.1:7878/form-post")
+        .post("http://localhost:7878/form-post")
         .form(&form_data)
         .send()
         .await
@@ -102,28 +104,30 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-// FLAKY WHEN RUN QUICKLY IN SUCCESSION!!
+
 // #[serial]
 // #[should_panic]
 // #[tokio::test]
 // async fn test_fail_when_no_remote_server() {
 //     let settings = Settings {
-//         local_port: Some(7878),
-//         proxies: vec![ProxyConfig::from_str(":3000").unwrap()],
+//         host: String::from("localhost"),
+//         local_port: 7878,
+//         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
 //     };
 //
 //     start_joubini(settings).await;
 //
 //     let client = reqwest::Client::new();
 //
-//     let _ = client.get("http://127.0.0.1:7878").send().await;
+//     let _ = client.get("http://localhost:7878").send().await;
 // }
 
 #[serial]
 #[tokio::test]
 async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3000").unwrap()],
     };
 
@@ -132,7 +136,7 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
 
     let client = reqwest::Client::new();
 
-    let res = client.get("http://127.0.0.1:7878").send().await?;
+    let res = client.get("http://localhost:7878").send().await?;
 
     let status = res.status();
     assert_eq!(status, StatusCode::OK);
@@ -147,7 +151,8 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo:3001")
             .expect("Unable to parse proxy string")],
     };
@@ -158,7 +163,7 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://127.0.0.1:7878/foo")
+        .get("http://localhost:7878/foo")
         .send()
         .await
         .expect("Request failed");
@@ -177,7 +182,8 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str("bar:3002/bar")
             .expect("Unable to parse proxy string")],
     };
@@ -188,7 +194,7 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://127.0.0.1:7878/bar")
+        .get("http://localhost:7878/bar")
         .send()
         .await
         .expect("HTTP request failed");
@@ -207,7 +213,8 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str("baz:3003/qux")
             .expect("Unable to parse proxy string")],
     };
@@ -218,7 +225,7 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://127.0.0.1:7878/baz")
+        .get("http://localhost:7878/baz")
         .send()
         .await
         .expect("HTTP request failed");
@@ -237,7 +244,8 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo:3004/bar/baz/qux")
             .expect("Unable to parse proxy config from string")],
     };
@@ -248,7 +256,7 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://127.0.0.1:7878/foo")
+        .get("http://localhost:7878/foo")
         .send()
         .await
         .expect("Unable to make HTTP request");
@@ -267,7 +275,8 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo/bar/baz:3005/qux")
             .expect("Unable to parse proxy settings from provided string")],
     };
@@ -278,7 +287,7 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let response = client
-        .get("http://127.0.0.1:7878/foo/bar/baz")
+        .get("http://localhost:7878/foo/bar/baz")
         .send()
         .await
         .expect("Failed to send HTTP request");
@@ -297,7 +306,8 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        local_port: Some(7878),
+        host: String::from("localhost"),
+        local_port: 7878,
         proxies: vec![
             ProxyConfig::from_str("foo:3008/fred")
                 .expect("unable to parse proxy string"),
@@ -358,11 +368,10 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
 }
 
 async fn start_joubini(settings: Settings) {
-    println!("starting joubini");
     let listener = Arc::new(
         tokio::net::TcpListener::bind(format!(
-            "127.0.0.1:{}",
-            settings.local_port.unwrap()
+            "localhost:{}",
+            settings.local_port
         ))
         .await
         .expect("Unable to bind to local port"),
@@ -380,11 +389,8 @@ async fn start_joubini(settings: Settings) {
 }
 
 async fn start_remote(port: u16, path: &'static str) {
-    println!("starting remote");
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
+    let listener = TcpListener::bind(format!("localhost:{}", port))
         .expect("Unable to listen on port");
-
-    println!("starting remote on 127.0.0.1:{}", port);
 
     let server = HttpServer::new(move || {
         App::new()

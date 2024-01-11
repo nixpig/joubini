@@ -46,19 +46,15 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, hyper::Error> {
-    println!("proxies: {:#?}", settings.proxies);
-    println!("req uri: {}", req.uri());
     let proxy = settings
         .proxies
         .iter()
         .rfind(|x| req.uri().to_string().starts_with(&x.local_path))
         .expect("Unable to unwrap proxy configs");
 
-    println!("try to connect to: {}", proxy.remote_port);
-    let addr = format!("127.0.0.1:{}", proxy.remote_port);
+    let addr = build_addr(&settings.host, proxy.remote_port);
 
     let stream = TcpStream::connect(addr).await.unwrap();
-    println!("connected to: {}", proxy.remote_port);
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
@@ -73,7 +69,7 @@ async fn handle(
     });
 
     let proxy_request =
-        build_request(req, settings.local_port.unwrap(), proxy).unwrap();
+        build_request(req, &settings.host, settings.local_port, proxy).unwrap();
 
     let res = send_request(client, proxy_request).await?;
 
@@ -82,24 +78,21 @@ async fn handle(
 
 pub fn build_request(
     mut req: Request<Incoming>,
+    host: &str,
     local_port: u16,
     proxy: &ProxyConfig,
 ) -> Result<Request<Incoming>, hyper::Error> {
+    let local_addr = build_addr(host, local_port);
+    let remote_addr = build_addr(host, proxy.remote_port);
+
     match req.headers_mut().entry(&*X_FORWARDED_FOR_HEADER_NAME) {
         hyper::header::Entry::Vacant(v) => {
-            v.insert(
-                HeaderValue::from_str(&format!("127.0.0.1:{}", local_port))
-                    .unwrap(),
-            );
+            v.insert(HeaderValue::from_str(&local_addr).unwrap());
         }
         hyper::header::Entry::Occupied(mut v) => {
             v.insert(
                 HeaderValue::from_str(
-                    &[
-                        v.get().to_str().unwrap(),
-                        &format!("127.0.0.1:{}", local_port),
-                    ]
-                    .join(", "),
+                    &[v.get().to_str().unwrap(), &local_addr].join(", "),
                 )
                 .unwrap(),
             );
@@ -108,8 +101,7 @@ pub fn build_request(
 
     req.headers_mut().insert(
         &*HOST_HEADER_NAME,
-        HeaderValue::from_str(&format!("127.0.0.1:{}", proxy.remote_port))
-            .unwrap(),
+        HeaderValue::from_str(&remote_addr).unwrap(),
     );
 
     let uri = req.uri().to_string();
@@ -119,8 +111,6 @@ pub fn build_request(
         .unwrap();
 
     *req.uri_mut() = mapped_uri;
-
-    println!("mapped request: {:#?}", req);
 
     Ok(req)
 }
@@ -132,4 +122,8 @@ pub async fn send_request(
     let res = client.send_request(proxy_request).await?;
 
     Ok(res)
+}
+
+fn build_addr(hostname: &str, port: u16) -> String {
+    format!("{}:{}", hostname, port)
 }

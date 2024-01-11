@@ -6,6 +6,15 @@
 )]
 pub struct Cli {
     #[clap(
+        short = 'H',
+        long = "host",
+        name = "host",
+        help = "Hostname or IP",
+        default_value = "localhost"
+    )]
+    pub host: String,
+
+    #[clap(
         short = 'P',
         long = "port",
         name = "local_port",
