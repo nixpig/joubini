@@ -85,13 +85,7 @@ pub fn build_request(
     add_x_forwarded_for_header(req.headers_mut(), &local_addr);
     add_host_header(req.headers_mut(), &remote_addr);
 
-    let req_uri = req.uri().to_string();
-    let mapped_uri: Uri = req_uri
-        .replace(&proxy.local_path, &proxy.remote_path)
-        .parse()
-        .unwrap();
-
-    *req.uri_mut() = mapped_uri;
+    *req.uri_mut() = map_proxy_uri(req.uri(), proxy);
 
     Ok(req)
 }
@@ -148,4 +142,12 @@ fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
         .iter()
         .rfind(|x| req_uri.starts_with(&x.local_path))
         .expect("Unable to unwrap proxy configs")
+}
+
+fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Uri {
+    req_uri
+        .to_string()
+        .replace(&proxy.local_path, &proxy.remote_path)
+        .parse()
+        .unwrap()
 }
