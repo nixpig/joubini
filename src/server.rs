@@ -26,6 +26,7 @@ pub async fn start(
     settings: Arc<Settings>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Listening on: {}", listener.local_addr().unwrap());
+    info!("{}", settings);
 
     loop {
         let (stream, _) = listener.clone().accept().await?;

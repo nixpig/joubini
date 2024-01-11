@@ -1,7 +1,7 @@
 use crate::cli::Cli;
 use crate::error::Error;
 use clap::Parser;
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
@@ -17,6 +17,27 @@ impl Default for Settings {
             local_port: 80,
             proxies: vec![],
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "\n{}",
+            self.proxies
+                .iter()
+                .map(|x| format!(
+                    "Proxy: {}:{}{} => :{}{}",
+                    self.host,
+                    self.local_port,
+                    x.local_path,
+                    x.remote_port,
+                    x.remote_path
+                ))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
     }
 }
 
