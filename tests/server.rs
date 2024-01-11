@@ -332,8 +332,6 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
         .await
         .expect("HTTP request failed");
 
-    println!("response_foo: {:#?}", response_foo);
-
     let response_foo_bar = client
         .get("http://localhost:7878/foo/bar")
         .send()
@@ -424,8 +422,6 @@ async fn post_json_ok(body: web::Json<PostData>) -> HttpResponse {
 
         HttpResponse::Ok().json(json_ok)
     } else {
-        println!("Forwarded body data does not match provided body data");
-
         HttpResponse::InternalServerError().into()
     }
 }
@@ -445,4 +441,3 @@ async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
         HttpResponse::InternalServerError().into()
     }
 }
-
