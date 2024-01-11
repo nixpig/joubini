@@ -6,6 +6,7 @@ use hyper::{
 };
 use lazy_static::lazy_static;
 use std::{error::Error, sync::Arc};
+use tracing::{error, info};
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -21,6 +22,8 @@ pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    info!("Listening on: {}", listener.local_addr().unwrap());
+
     loop {
         let (stream, _) = listener.clone().accept().await?;
 
@@ -36,7 +39,7 @@ pub async fn start(
                 )
                 .await
             {
-                eprintln!("Error serving connection: {}", err);
+                error!("Error serving connection: {}", err);
             }
         });
     }
@@ -60,14 +63,28 @@ async fn handle(
 
     tokio::task::spawn(async move {
         if let Err(err) = connection.await {
-            eprintln!("Unable to establish connection: {:?}", err);
+            error!("Unable to establish connection: {:?}", err);
         }
     });
+
+    let request_uri = req.uri().clone();
+    let request_method = req.method().clone();
 
     let proxy_request =
         build_request(req, &settings.host, settings.local_port, proxy).unwrap();
 
+    let proxy_uri = proxy_request.uri().clone();
+
     let res = send_request(client, proxy_request).await?;
+
+    info!(
+        "{} {} {} => :{}{}",
+        res.status().as_u16(),
+        request_method,
+        request_uri,
+        proxy.remote_port,
+        proxy_uri
+    );
 
     Ok(res.map(|b| b.boxed()))
 }
