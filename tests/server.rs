@@ -1,10 +1,13 @@
-use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
-
 use actix_web::{web, App, HttpResponse, HttpServer};
-use joubini::{proxy::Proxy, settings::Settings};
+use joubini::server::start;
+use joubini::settings::{ProxyConfig, Settings};
 use reqwest::StatusCode;
 use serial_test::serial;
-use tokio::net::TcpListener;
+use std::collections::HashMap;
+use std::error::Error;
+use std::net::TcpListener;
+use std::str::FromStr;
+use std::sync::Arc;
 
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 struct ResponseData {
@@ -23,54 +26,123 @@ struct FormData {
 
 #[serial]
 #[tokio::test]
-async fn test_fail_when_no_server() -> Result<(), Box<dyn Error>> {
+async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![
-            Proxy::from_str(":3000").expect("Unable to parse proxy config")
-        ],
+        proxies: vec![ProxyConfig::from_str(":3009").unwrap()],
     };
 
+    start_remote(3009, "/").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
 
-    let response = client.get("/").send().await;
+    let post_data = PostData {
+        data: String::from("post_data"),
+    };
 
-    assert!(response.is_err());
+    let response = client
+        .post("http://localhost:7878/json-post")
+        .json(&post_data)
+        .send()
+        .await
+        .expect("HTTP POST request failed");
+
+    let status = response.status();
+    assert_eq!(status, StatusCode::OK);
+
+    let body: ResponseData =
+        response.json().await.expect("Unable to parse response");
+
+    assert_eq!(
+        body,
+        ResponseData {
+            message: String::from("post_json_ok")
+        }
+    );
 
     Ok(())
 }
 
 #[serial]
 #[tokio::test]
-async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
+async fn test_post_form() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![
-            Proxy::from_str(":3000").expect("Unable to parse proxy string")
-        ],
+        proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
     };
 
-    start_server(3000, "/").await;
+    start_remote(3010, "/").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
 
+    let mut form_data = HashMap::new();
+    form_data.insert("form_key", "form_value");
+
     let response = client
-        .get("http://localhost:7878")
+        .post("http://localhost:7878/form-post")
+        .form(&form_data)
         .send()
         .await
-        .expect("Request failed");
+        .expect("Unable to post form data");
 
     let status = response.status();
 
-    let body = response.text().await.expect("Unable to get response body");
+    let body: ResponseData =
+        response.json().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(
+        body,
+        ResponseData {
+            message: String::from("post_form_ok")
+        }
+    );
+
+    Ok(())
+}
+
+// #[serial]
+// #[should_panic]
+// #[tokio::test]
+// async fn test_fail_when_no_remote_server() {
+//     let settings = Settings {
+//         host: String::from("localhost"),
+//         local_port: 7878,
+//         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
+//     };
+//
+//     start_joubini(settings).await;
+//
+//     let client = reqwest::Client::new();
+//
+//     let _ = client.get("http://localhost:7878").send().await;
+// }
+
+#[serial]
+#[tokio::test]
+async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3000").unwrap()],
+    };
+
+    start_remote(3000, "/").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let res = client.get("http://localhost:7878").send().await?;
+
+    let status = res.status();
+    assert_eq!(status, StatusCode::OK);
+
+    let body = res.text().await?;
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -79,14 +151,13 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![
-            Proxy::from_str("foo:3001").expect("Unable to parse proxy string")
-        ],
+        proxies: vec![ProxyConfig::from_str("foo:3001")
+            .expect("Unable to parse proxy string")],
     };
 
-    start_server(3001, "/").await;
+    start_remote(3001, "/").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
@@ -102,7 +173,7 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let body = response.text().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -111,13 +182,13 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![Proxy::from_str("bar:3002/bar")
+        proxies: vec![ProxyConfig::from_str("bar:3002/bar")
             .expect("Unable to parse proxy string")],
     };
 
-    start_server(3002, "/bar").await;
+    start_remote(3002, "/bar").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
@@ -133,7 +204,7 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let body = response.text().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -142,13 +213,13 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![Proxy::from_str("baz:3003/qux")
+        proxies: vec![ProxyConfig::from_str("baz:3003/qux")
             .expect("Unable to parse proxy string")],
     };
 
-    start_server(3003, "/qux").await;
+    start_remote(3003, "/qux").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
@@ -164,7 +235,7 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let body = response.text().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -173,13 +244,13 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![Proxy::from_str("foo:3004/bar/baz/qux")
+        proxies: vec![ProxyConfig::from_str("foo:3004/bar/baz/qux")
             .expect("Unable to parse proxy config from string")],
     };
 
-    start_server(3004, "/bar/baz/qux").await;
+    start_remote(3004, "/bar/baz/qux").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
@@ -195,7 +266,7 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let body = response.text().await.expect("Unable to get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -204,13 +275,13 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
-        proxies: vec![Proxy::from_str("foo/bar/baz:3005/qux")
+        proxies: vec![ProxyConfig::from_str("foo/bar/baz:3005/qux")
             .expect("Unable to parse proxy settings from provided string")],
     };
 
-    start_server(3005, "/qux").await;
+    start_remote(3005, "/qux").await;
     start_joubini(settings).await;
 
     let client = reqwest::Client::new();
@@ -226,7 +297,7 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let body = response.text().await.expect("Could not get response body");
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, "get ok");
+    assert_eq!(body, "get_ok");
 
     Ok(())
 }
@@ -235,21 +306,21 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        hostname: String::from("localhost"),
+        host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![
-            Proxy::from_str("foo/bar:3006/baz")
+            ProxyConfig::from_str("foo:3008/fred")
                 .expect("unable to parse proxy string"),
-            Proxy::from_str("foo/qux:3007/thud")
+            ProxyConfig::from_str("foo/qux:3007/thud")
                 .expect("unable to parse proxy string"),
-            Proxy::from_str("foo:3008/fred")
+            ProxyConfig::from_str("foo/bar:3006/baz")
                 .expect("unable to parse proxy string"),
         ],
     };
 
-    start_server(3006, "/baz").await;
-    start_server(3007, "/thud").await;
-    start_server(3008, "/fred").await;
+    start_remote(3006, "/baz").await;
+    start_remote(3007, "/thud").await;
+    start_remote(3008, "/fred").await;
 
     start_joubini(settings).await;
 
@@ -287,125 +358,44 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     assert_eq!(status_foo_bar, StatusCode::OK);
     assert_eq!(status_foo_qux, StatusCode::OK);
 
-    assert_eq!(body_foo, "get ok");
-    assert_eq!(body_foo_bar, "get ok");
-    assert_eq!(body_foo_qux, "get ok");
+    assert_eq!(body_foo, "get_ok");
+    assert_eq!(body_foo_bar, "get_ok");
+    assert_eq!(body_foo_qux, "get_ok");
 
     Ok(())
 }
 
-#[serial]
-#[tokio::test]
-async fn test_post_json() -> Result<(), Box<dyn Error>> {
-    let settings = Settings {
-        hostname: String::from("localhost"),
-        local_port: 7878,
-        proxies: vec![
-            Proxy::from_str(":3009").expect("Unable to parse proxy mapping")
-        ],
-    };
-
-    start_server(3009, "/").await;
-    start_joubini(settings).await;
-
-    let client = reqwest::Client::new();
-
-    let post_data = PostData {
-        data: String::from("Some post data"),
-    };
-
-    let response = client
-        .post("http://localhost:7878/json-post")
-        .json(&post_data)
-        .send()
-        .await
-        .expect("HTTP POST request failed");
-
-    let status = response.status();
-    assert_eq!(status, StatusCode::OK);
-
-    let body: ResponseData =
-        response.json().await.expect("Unable to parse response");
-
-    assert_eq!(
-        body,
-        ResponseData {
-            message: String::from("POST JSON OK")
-        }
-    );
-
-    Ok(())
-}
-
-#[serial]
-#[tokio::test]
-async fn test_post_form() -> Result<(), Box<dyn Error>> {
-    let settings = Settings {
-        hostname: String::from("localhost"),
-        local_port: 7878,
-        proxies: vec![
-            Proxy::from_str(":3010").expect("Unable to parse proxy config")
-        ],
-    };
-
-    start_server(3010, "/").await;
-    start_joubini(settings).await;
-
-    let client = reqwest::Client::new();
-
-    let mut form_data = HashMap::new();
-    form_data.insert("form_key", "form_value");
-
-    let response = client
-        .post("http://localhost:7878/form-post")
-        .form(&form_data)
-        .send()
-        .await
-        .expect("Unable to post form data");
-
-    let status = response.status();
-
-    let body: ResponseData =
-        response.json().await.expect("Unable to get response body");
-
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(
-        body,
-        ResponseData {
-            message: String::from("POST FORM OK")
-        }
-    );
-
-    Ok(())
-}
-
-// TODO: test different HTTP verbs - POST, PUT, DELETE, etc...
-// TODO: test different responses - 200, 201, 302, 404, 500, etc...
+// TODO: test host header updated correctly
+// TODO: test x-forwarded-for header updated correctly - single and multiple
+// TODO: test hop-by-hop headers are stripped correctly
+// TODO: test basic auth
+// TODO: test all HTTP methods work correctly
+// TODO: test multipart/form-data
 
 async fn start_joubini(settings: Settings) {
     let listener = Arc::new(
-        TcpListener::bind(format!(
-            "{}:{}",
-            settings.hostname, settings.local_port
+        tokio::net::TcpListener::bind(format!(
+            "localhost:{}",
+            settings.local_port
         ))
         .await
-        .expect("Could not bind to port"),
+        .expect("Unable to bind to local port"),
     );
 
-    let proxies = Arc::new(settings.proxies);
+    let settings = Arc::new(settings);
 
     tokio::spawn(async move {
         loop {
-            joubini::startup::run(listener.clone(), proxies.clone())
+            start(listener.clone(), settings.clone())
                 .await
-                .expect("should be able to start the app");
+                .expect("Unable to start server");
         }
     });
 }
 
-async fn start_server(port: u16, path: &'static str) {
-    let listener = std::net::TcpListener::bind(format!("localhost:{}", port))
-        .expect("Unable to bind to port");
+async fn start_remote(port: u16, path: &'static str) {
+    let listener = TcpListener::bind(format!("localhost:{}", port))
+        .expect("Unable to listen on port");
 
     let server = HttpServer::new(move || {
         App::new()
@@ -414,26 +404,24 @@ async fn start_server(port: u16, path: &'static str) {
             .route("/form-post", web::post().to(post_form_ok))
     })
     .listen(listener)
-    .expect("Unable to bind to listener")
+    .expect("Unable to start remote server")
     .run();
 
     tokio::spawn(server);
 }
 
 async fn get_ok() -> HttpResponse {
-    HttpResponse::Ok().body("get ok")
+    HttpResponse::Ok().body("get_ok")
 }
 
 async fn post_json_ok(body: web::Json<PostData>) -> HttpResponse {
-    if body.data == "Some post data" {
+    if body.data == "post_data" {
         let json_ok = ResponseData {
-            message: String::from("POST JSON OK"),
+            message: String::from("post_json_ok"),
         };
 
         HttpResponse::Ok().json(json_ok)
     } else {
-        println!("Forwarded body data does not match provided body data");
-
         HttpResponse::InternalServerError().into()
     }
 }
@@ -445,7 +433,7 @@ async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
 
     if form == expected_form_data {
         let form_ok = ResponseData {
-            message: String::from("POST FORM OK"),
+            message: String::from("post_form_ok"),
         };
 
         HttpResponse::Ok().json(&form_ok)

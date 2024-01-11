@@ -46,10 +46,10 @@ This is how I'd like it to work...either by CLI args or config file:
 Ordering of proxy configurations matters.
 
 ❌ This (probably) **will not** work as intended:
-`joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
+`joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
 ✅ This (probably) **will** work as intended:
-`joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
+`joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
 
 ### CLI arguments
 
@@ -81,8 +81,7 @@ joubini
 ```yaml
 # joubini.yml
 
-- hostname: localhost
-  proxy:
+- proxies:
     # http://localhost -> http://localhost:3000
     - :3000
 
@@ -95,6 +94,10 @@ joubini
     # http://localhost/db -> http://localhost:5432
     - db:5432
 ```
+
+### Notes
+
+Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
 ## Motivation
 

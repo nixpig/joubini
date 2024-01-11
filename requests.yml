@@ -1,0 +1,17 @@
+- host: localhost
+  port: 7878
+  name: localhost
+  resource: /
+
+- host: 127.0.0.1
+  port: 7878
+  name: 127.0.0.1
+  resource: /
+
+- host: 127.0.0.1
+  port: 7878
+  name: post
+  method: post
+  resource: /foo
+  body:
+    bar: baz

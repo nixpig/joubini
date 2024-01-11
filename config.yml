@@ -1,0 +1,3 @@
+proxies:
+  - "zero:3000/comments"
+  - "one:3001/posts"
