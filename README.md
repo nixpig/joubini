@@ -95,6 +95,10 @@ joubini
     - db:5432
 ```
 
+### Notes
+
+Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
+
 ## Motivation
 
 Just wanted an interesting little project to work on in Rust which involves some basic networking stuff and that would actually be useful.

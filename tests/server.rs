@@ -367,6 +367,13 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// TODO: test host header updated correctly
+// TODO: test x-forwarded-for header updated correctly - single and multiple
+// TODO: test hop-by-hop headers are stripped correctly
+// TODO: test basic auth
+// TODO: test all HTTP methods work correctly
+// TODO: test multipart/form-data
+
 async fn start_joubini(settings: Settings) {
     let listener = Arc::new(
         tokio::net::TcpListener::bind(format!(
@@ -438,3 +445,4 @@ async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
         HttpResponse::InternalServerError().into()
     }
 }
+

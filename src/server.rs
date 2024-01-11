@@ -2,7 +2,7 @@ use crate::settings::{ProxyConfig, Settings};
 use hyper::{
     client::conn::http1::SendRequest,
     header::{HeaderName, HeaderValue},
-    Uri,
+    HeaderMap, Uri,
 };
 use lazy_static::lazy_static;
 use std::{error::Error, sync::Arc};
@@ -46,11 +46,7 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, hyper::Error> {
-    let proxy = settings
-        .proxies
-        .iter()
-        .rfind(|x| req.uri().to_string().starts_with(&x.local_path))
-        .expect("Unable to unwrap proxy configs");
+    let proxy = get_proxy(req.uri().to_string(), &settings.proxies);
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
@@ -85,27 +81,12 @@ pub fn build_request(
     let local_addr = build_addr(host, local_port);
     let remote_addr = build_addr(host, proxy.remote_port);
 
-    match req.headers_mut().entry(&*X_FORWARDED_FOR_HEADER_NAME) {
-        hyper::header::Entry::Vacant(v) => {
-            v.insert(HeaderValue::from_str(&local_addr).unwrap());
-        }
-        hyper::header::Entry::Occupied(mut v) => {
-            v.insert(
-                HeaderValue::from_str(
-                    &[v.get().to_str().unwrap(), &local_addr].join(", "),
-                )
-                .unwrap(),
-            );
-        }
-    };
+    strip_hop_by_hop_headers(req.headers_mut());
+    add_x_forwarded_for_header(req.headers_mut(), &local_addr);
+    add_host_header(req.headers_mut(), &remote_addr);
 
-    req.headers_mut().insert(
-        &*HOST_HEADER_NAME,
-        HeaderValue::from_str(&remote_addr).unwrap(),
-    );
-
-    let uri = req.uri().to_string();
-    let mapped_uri: Uri = uri
+    let req_uri = req.uri().to_string();
+    let mapped_uri: Uri = req_uri
         .replace(&proxy.local_path, &proxy.remote_path)
         .parse()
         .unwrap();
@@ -126,4 +107,45 @@ pub async fn send_request(
 
 fn build_addr(hostname: &str, port: u16) -> String {
     format!("{}:{}", hostname, port)
+}
+
+fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
+    headers.remove(hyper::header::CONNECTION);
+    headers.remove(HeaderName::from_static("keep-alive"));
+    headers.remove(hyper::header::PROXY_AUTHENTICATE);
+    headers.remove(hyper::header::PROXY_AUTHORIZATION);
+    headers.remove(hyper::header::TE);
+    headers.remove(hyper::header::TRAILER);
+    headers.remove(hyper::header::TRANSFER_ENCODING);
+    headers.remove(hyper::header::UPGRADE);
+}
+
+fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
+    match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
+        hyper::header::Entry::Vacant(v) => {
+            v.insert(HeaderValue::from_str(local_addr).unwrap());
+        }
+        hyper::header::Entry::Occupied(mut v) => {
+            v.insert(
+                HeaderValue::from_str(
+                    &[v.get().to_str().unwrap(), local_addr].join(", "),
+                )
+                .unwrap(),
+            );
+        }
+    };
+}
+
+fn add_host_header(headers: &mut HeaderMap, remote_addr: &str) {
+    headers.insert(
+        &*HOST_HEADER_NAME,
+        HeaderValue::from_str(remote_addr).unwrap(),
+    );
+}
+
+fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
+    proxies
+        .iter()
+        .rfind(|x| req_uri.starts_with(&x.local_path))
+        .expect("Unable to unwrap proxy configs")
 }
