@@ -82,18 +82,11 @@ impl FromStr for ProxyConfig {
                 (remote, "")
             };
 
-            if let Ok(remote_port) = remote_port.parse::<u16>() {
-                Ok(ProxyConfig {
-                    local_path: ["/", local_path].join(""),
-                    remote_port,
-                    remote_path: ["/", remote_path].join(""),
-                })
-            } else {
-                Err(Error::ProxyConfigParseError(format!(
-                    "'{}' is not a valid port number.",
-                    remote_port
-                )))
-            }
+            Ok(ProxyConfig {
+                local_path: ["/", local_path].join(""),
+                remote_port: remote_port.parse::<u16>()?,
+                remote_path: ["/", remote_path].join(""),
+            })
         } else {
             Err(Error::ProxyConfigParseError(format!(
                 "Colon (:) prefix for remote port definition missing in proxy config: '{}'",
@@ -149,9 +142,8 @@ impl TryFrom<PathBuf> for Settings {
     type Error = Error;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let config_str = fs::read_to_string(path).unwrap();
-        let config_yaml: ConfigFileProxies =
-            serde_yaml::from_str(&config_str).unwrap();
+        let config_str = fs::read_to_string(path)?;
+        let config_yaml: ConfigFileProxies = serde_yaml::from_str(&config_str)?;
 
         match config_yaml
             .proxies
@@ -176,7 +168,7 @@ pub fn get_settings() -> Result<Settings, Error> {
     let mut cli_settings = Cli::parse().try_into()?;
 
     let mut file_settings =
-        Settings::try_from(PathBuf::from_str("config.yml").unwrap()).unwrap();
+        Settings::try_from(PathBuf::from_str("config.yml").unwrap())?;
 
     Ok(Settings::new()
         .merge(&mut file_settings)
