@@ -11,22 +11,9 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ## Features
 
-```shell
-$ joubini --help
+- Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
-A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
-
-Usage: joubini [OPTIONS]
-
-Options:
-  -p, --proxy <proxy_config>  Configuration for proxy in format '<local_path>:<remote_port>/<remote_path>'
-  -P, --port <port>           Local port to listen on. [default: 80]
-  -h, --help                  Print help
-  -V, --version               Print version
-
-```
-
-## Examples
+### Examples
 
 ## Installation
 
@@ -39,7 +26,22 @@ Options:
 
 ## Usage
 
-This is how I'd like it to work...either by CLI args or config file:
+```shell
+$ joubini --help
+
+A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
+
+Usage: joubini [OPTIONS]
+
+Options:
+  -H, --host <host>           Hostname or IP [default: localhost]
+  -P, --port <local_port>     Local port for reverse proxy server to listen on [default: 80]
+  -p, --proxy <proxy_config>  Configuration for proxy in format '</local_path?><:remote_port!></remote_path?>'
+  -c, --config <config_file>  Path to configuration file
+  -h, --help                  Print help
+  -V, --version               Print version
+
+```
 
 ### Note
 
@@ -51,57 +53,24 @@ Ordering of proxy configurations matters.
 ✅ This (probably) **will** work as intended:
 `joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
 
-### CLI arguments
+### Config file (optional)
 
-```shell
-joubini
-
-	# defaults to 80 if not specified (see note below about granting access to ports below 1024)
-	-P | --port=7878
-
-	# http://localhost -> http://localhost:3000
-	-p | --proxy=:3000
-
-	# http://localhost/api -> http://localhost:3001/api
-	-p | --proxy=api:3001/api
-
-	# http://localhost/admin -> http://localhost:3002/dashboard
-	-p | --proxy=admin:3002/dashboard
-
-	# http://localhost/db -> http://localhost:5432
-	-p | --proxy=db:5432
-
-	# http://localhost/deep -> http://localhost:3003/deep/nested/path
-	-p | --proxy=deep:3003/deep/nested/path
-
-```
-
-### Config file
+Proxies defined in the config file follow the same pattern as via CLI, i.e. `</local_path?><:remote_port!></remote_path?>`
 
 ```yaml
 # joubini.yml
-
-- proxies:
-    # http://localhost -> http://localhost:3000
-    - :3000
-
-    # http://localhost/api -> http://localhost:3001/api
-    - api:3001/api
-
-    # http://localhost/admin -> http://localhost:3002/dashboard
-    - admin:3002/dashboard
-
-    # http://localhost/db -> http://localhost:5432
-    - db:5432
+host: 127.0.0.1
+port: 80
+proxies:
+  - :3000 # http://localhost -> http://localhost:3000
+  - api:3001/api # http://localhost/api -> http://localhost:3001/api
+  - admin:3002/dashboard # http://localhost/admin -> http://localhost:3002/dashboard
+  - db:5432 # http://localhost/db -> http://localhost:5432
 ```
-
-### Notes
-
-Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
 ## Motivation
 
-Just wanted an interesting little project to work on in Rust which involves some basic networking stuff and that would actually be useful.
+I just wanted an interesting little project to work on in Rust which involves some basic networking stuff and that would actually be useful.
 
 ## Alternatives
 
@@ -113,7 +82,7 @@ Just wanted an interesting little project to work on in Rust which involves some
 
 Any suggestions, feel free to open an [issue](https://github.com/nixpig/joubini/issues).
 
-### Development
+## Development
 
 In order to bind to port 80 (or any port below 1024), you'll need to grant access to the binary to do so.
 
