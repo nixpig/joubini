@@ -28,6 +28,7 @@ struct FormData {
 #[tokio::test]
 async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3009").unwrap()],
@@ -69,6 +70,7 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_post_form() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
@@ -126,6 +128,7 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str(":3000").unwrap()],
@@ -151,6 +154,7 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo:3001")
@@ -182,6 +186,7 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str("bar:3002/bar")
@@ -213,6 +218,7 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str("baz:3003/qux")
@@ -244,6 +250,7 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo:3004/bar/baz/qux")
@@ -275,6 +282,7 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![ProxyConfig::from_str("foo/bar/baz:3005/qux")
@@ -306,6 +314,7 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
+        config: None,
         host: String::from("localhost"),
         local_port: 7878,
         proxies: vec![
