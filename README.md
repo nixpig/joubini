@@ -11,6 +11,8 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ## Features
 
+![Screenshot of Joubini running as reverse proxy](screenshot.png)
+
 - Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
 ### Examples
