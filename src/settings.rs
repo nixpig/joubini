@@ -8,6 +8,7 @@ pub struct Settings {
     pub host: String,
     pub local_port: u16,
     pub proxies: Vec<ProxyConfig>,
+    pub config: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -16,6 +17,7 @@ impl Default for Settings {
             host: String::from("localhost"),
             local_port: 80,
             proxies: vec![],
+            config: None,
         }
     }
 }
@@ -56,6 +58,7 @@ impl Settings {
             host: other.host.clone(),
             local_port: other.local_port,
             proxies,
+            config: other.config.clone(),
         }
     }
 }
@@ -107,6 +110,7 @@ impl TryFrom<Cli> for Settings {
                 host: value.host,
                 local_port: value.local_port,
                 proxies,
+                config: value.config,
             }),
             Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
         }
@@ -136,7 +140,7 @@ impl TryFrom<PathBuf> for Settings {
     type Error = Error;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let config_str = fs::read_to_string(path)?;
+        let config_str = fs::read_to_string(&path)?;
         let config_yaml: ConfigFileProxies = serde_yaml::from_str(&config_str)?;
 
         match config_yaml
@@ -149,19 +153,23 @@ impl TryFrom<PathBuf> for Settings {
                 host: config_yaml.host,
                 local_port: config_yaml.local_port,
                 proxies,
+                config: Some(path),
             }),
-            Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
+            Err(_) => Err(Error::ParseError(ParseError::FileConfig)),
         }
     }
 }
 
 pub fn get_settings() -> Result<Settings, Error> {
-    let mut cli_settings = Cli::parse().try_into()?;
+    let mut cli_settings: Settings = Cli::parse().try_into()?;
 
-    let mut file_settings =
-        Settings::try_from(PathBuf::from_str("config.yml").unwrap())?;
+    if let Some(config_file) = &cli_settings.config {
+        let mut file_settings = Settings::try_from(PathBuf::from(config_file))?;
 
-    Ok(Settings::new()
-        .merge(&mut file_settings)
-        .merge(&mut cli_settings))
+        Ok(Settings::new()
+            .merge(&mut file_settings)
+            .merge(&mut cli_settings))
+    } else {
+        Ok(cli_settings)
+    }
 }
