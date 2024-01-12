@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 #[derive(clap::Parser, Debug)]
 #[clap(
     author = "@nixpig",
@@ -30,4 +32,12 @@ pub struct Cli {
         help = "Configuration for proxy in format '<:local_port?></local_path?><:remote_port!></remote_path?>'"
     )]
     pub proxies: Vec<String>,
+
+    #[clap(
+        short = 'c',
+        long = "config",
+        name = "config_file",
+        help = "Path to configuration file"
+    )]
+    pub config: Option<PathBuf>,
 }

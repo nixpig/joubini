@@ -85,6 +85,7 @@ fn test_parse_settings_from_config_file_with_optional_fields(
     assert_eq!(
         settings,
         Settings {
+            config: Some(PathBuf::from("tests/config.yml")),
             host: String::from("localhost"),
             local_port: 7878,
             proxies: vec![
@@ -131,6 +132,7 @@ fn test_parse_settings_from_config_file_without_optional_fields(
     assert_eq!(
         settings,
         Settings {
+            config: Some(PathBuf::from("tests/config-without-options.yml")),
             host: String::from("localhost"),
             local_port: 80,
             proxies: vec![
@@ -169,6 +171,7 @@ fn test_parse_settings_from_config_file_without_optional_fields(
 #[test]
 fn test_parse_settings_from_cli() -> Result<(), Box<dyn Error>> {
     let config = Cli {
+        config: Some(PathBuf::from("tests/config.yml")),
         host: String::from("127.0.0.1"),
         local_port: 7878,
         proxies: vec![
@@ -185,6 +188,7 @@ fn test_parse_settings_from_cli() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         settings,
         Settings {
+            config: Some(PathBuf::from("tests/config.yml")),
             host: String::from("127.0.0.1"),
             local_port: 7878,
             proxies: vec![
@@ -223,6 +227,7 @@ fn test_parse_settings_from_cli() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
     let mut settings_1 = Settings {
+        config: None,
         host: String::from("localhost_1"),
         local_port: 7878,
         proxies: vec![ProxyConfig {
@@ -233,6 +238,7 @@ fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
     };
 
     let mut settings_2 = Settings {
+        config: None,
         host: String::from("localhost_2"),
         local_port: 7879,
         proxies: vec![ProxyConfig {
@@ -247,6 +253,7 @@ fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         merged_settings,
         Settings {
+            config: None,
             host: String::from("localhost_2"),
             local_port: 7879,
             proxies: vec![
@@ -278,6 +285,7 @@ fn test_create_new_settings() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         new_settings,
         Settings {
+            config: None,
             host: String::from("localhost"),
             local_port: 80,
             proxies: vec![]
@@ -293,6 +301,7 @@ fn test_create_default_settings() -> Result<(), Box<dyn Error>> {
     assert_eq!(
         default_settings,
         Settings {
+            config: None,
             host: String::from("localhost"),
             local_port: 80,
             proxies: vec![]
