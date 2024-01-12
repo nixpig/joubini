@@ -1,11 +1,11 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
-use joubini::{server::start, settings::get_settings};
+use joubini::{error::Error, server::start, settings::get_settings};
 use tokio::net::TcpListener;
 use tracing_subscriber::fmt::format::FmtSpan;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), Error> {
     let log_filter = std::env::var("RUST_LOG").unwrap_or("info".to_owned());
 
     tracing_subscriber::fmt()

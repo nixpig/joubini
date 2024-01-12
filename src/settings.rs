@@ -1,5 +1,5 @@
-use crate::cli::Cli;
 use crate::error::Error;
+use crate::{cli::Cli, error::ParseError};
 use clap::Parser;
 use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
 
@@ -88,10 +88,7 @@ impl FromStr for ProxyConfig {
                 remote_path: ["/", remote_path].join(""),
             })
         } else {
-            Err(Error::ProxyConfigParseError(format!(
-                "Colon (:) prefix for remote port definition missing in proxy config: '{}'",
-                s
-            )))
+            Err(Error::ParseError(ParseError::CliConfig))
         }
     }
 }
@@ -111,10 +108,7 @@ impl TryFrom<Cli> for Settings {
                 local_port: value.local_port,
                 proxies,
             }),
-            Err(e) => Err(Error::SettingsParseError(format!(
-                "Unable to parse settings: {}",
-                e
-            ))),
+            Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
         }
     }
 }
@@ -156,10 +150,7 @@ impl TryFrom<PathBuf> for Settings {
                 local_port: config_yaml.local_port,
                 proxies,
             }),
-            Err(e) => Err(Error::SettingsParseError(format!(
-                "Unable to parse settings: {}",
-                e
-            ))),
+            Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
         }
     }
 }

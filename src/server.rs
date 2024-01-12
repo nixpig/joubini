@@ -1,5 +1,5 @@
 use crate::{
-    error::Error,
+    error::{Error, ProxyError},
     settings::{ProxyConfig, Settings},
 };
 use hyper::{
@@ -24,8 +24,8 @@ use tokio::net::{TcpListener, TcpStream};
 pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Listening on: {}", listener.local_addr().unwrap());
+) -> Result<(), Error> {
+    info!("Listening on: {}", listener.local_addr()?);
     info!("{}", settings);
 
     loop {
@@ -52,8 +52,8 @@ pub async fn start(
 async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
-) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, hyper::Error> {
-    let proxy = get_proxy(req.uri().to_string(), &settings.proxies);
+) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
+    let proxy = get_proxy(req.uri().to_string(), &settings.proxies)?;
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
@@ -103,18 +103,15 @@ pub fn build_request(
     let remote_addr = build_addr(host, proxy.remote_port);
 
     strip_hop_by_hop_headers(req.headers_mut());
-    add_x_forwarded_for_header(req.headers_mut(), &local_addr);
-    add_host_header(req.headers_mut(), &remote_addr);
+    add_x_forwarded_for_header(req.headers_mut(), &local_addr)?;
+    add_host_header(req.headers_mut(), &remote_addr)?;
 
     match map_proxy_uri(req.uri(), proxy) {
         Ok(v) => {
             *req.uri_mut() = v;
             Ok(req)
         }
-        Err(e) => Err(Error::RequestBuildError(format!(
-            "URI mapping failed: {}",
-            e
-        ))),
+        Err(_) => Err(Error::ProxyError(ProxyError::MapFailed)),
     }
 }
 
@@ -142,43 +139,48 @@ fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
     headers.remove(hyper::header::UPGRADE);
 }
 
-fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
+fn add_x_forwarded_for_header(
+    headers: &mut HeaderMap,
+    local_addr: &str,
+) -> Result<(), Error> {
     match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
         hyper::header::Entry::Vacant(v) => {
-            v.insert(HeaderValue::from_str(local_addr).unwrap());
+            v.insert(HeaderValue::from_str(local_addr)?);
         }
         hyper::header::Entry::Occupied(mut v) => {
-            v.insert(
-                HeaderValue::from_str(
-                    &[v.get().to_str().unwrap(), local_addr].join(", "),
-                )
-                .unwrap(),
-            );
+            v.insert(HeaderValue::from_str(
+                &[v.get().to_str().unwrap(), local_addr].join(", "),
+            )?);
         }
     };
+
+    Ok(())
 }
 
-fn add_host_header(headers: &mut HeaderMap, remote_addr: &str) {
-    headers.insert(
-        &*HOST_HEADER_NAME,
-        HeaderValue::from_str(remote_addr).unwrap(),
-    );
+fn add_host_header(
+    headers: &mut HeaderMap,
+    remote_addr: &str,
+) -> Result<(), Error> {
+    let host = HeaderValue::from_str(remote_addr)?;
+
+    headers.insert(&*HOST_HEADER_NAME, host);
+
+    Ok(())
 }
 
-fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
-    proxies
-        .iter()
-        .rfind(|x| req_uri.starts_with(&x.local_path))
-        .expect("Unable to find proxy config")
+fn get_proxy(
+    req_uri: String,
+    proxies: &[ProxyConfig],
+) -> Result<&ProxyConfig, Error> {
+    match proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path)) {
+        Some(v) => Ok(v),
+        None => Err(Error::ProxyError(ProxyError::NoProxy)),
+    }
 }
 
 fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
-    match req_uri
+    Ok(req_uri
         .to_string()
         .replace(&proxy.local_path, &proxy.remote_path)
-        .parse()
-    {
-        Ok(v) => Ok(v),
-        Err(e) => Err(Error::ProxyUriMapError(e)),
-    }
+        .parse::<hyper::Uri>()?)
 }
