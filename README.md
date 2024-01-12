@@ -47,10 +47,10 @@ Options:
 
 Ordering of proxy configurations matters.
 
-❌ This (probably) **will not** work as intended:
+❌ This **will not** work as (probably) intended:
 `joubini --proxy=myapp/api:3001/api --proxy=myapp:3000/ui`
 
-✅ This (probably) **will** work as intended:
+✅ This **will** work as (probably) intended:
 `joubini --proxy=myapp:3000/ui --proxy=myapp/api:3001/api`
 
 ### Config file (optional)
