@@ -3,7 +3,6 @@ use crate::{cli::Cli, error::ParseError};
 use clap::Parser;
 use std::ffi::OsString;
 use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
-use tracing::debug;
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
@@ -28,11 +27,11 @@ impl Display for Settings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "\n{}",
+            "\n{}\n",
             self.proxies
                 .iter()
                 .map(|x| format!(
-                    "Proxy: {}:{}{} => :{}{}",
+                    "\x1b[95mᴥ\x1b[0m {}:{}{} \x1b[94m➡\x1b[0m :{}{}",
                     self.host,
                     self.local_port,
                     x.local_path,
@@ -160,11 +159,9 @@ impl TryFrom<PathBuf> for Settings {
 
 pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
     let mut cli_settings: Settings = Cli::parse_from(cli_args).try_into()?;
-    debug!("cli_settings: {}", cli_settings);
 
     if let Some(config_file) = &cli_settings.config {
         let mut file_settings = Settings::try_from(PathBuf::from(config_file))?;
-        debug!("file_settings: {}", file_settings);
 
         Ok(Settings::new()
             .merge(&mut cli_settings)

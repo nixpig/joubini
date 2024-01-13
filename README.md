@@ -57,7 +57,11 @@ Ordering of proxy configurations matters.
 
 ### Config file (optional)
 
-Proxies defined in the config file follow the same pattern as via CLI, i.e. `</local_path?><:remote_port!></remote_path?>`
+If a config file is provided then no other provided CLI arguments will be parsed.
+
+Proxies defined in the config file follow the same pattern as via CLI, i.e.
+
+`</local_path?><:remote_port!></remote_path?>`
 
 ```yaml
 # joubini.yml

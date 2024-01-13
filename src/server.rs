@@ -9,7 +9,6 @@ use hyper::{
 };
 use lazy_static::lazy_static;
 use std::sync::Arc;
-use tracing::{error, info};
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -25,8 +24,8 @@ pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
-    info!("Listening on: {}", listener.local_addr()?);
-    info!("{}", settings);
+    println!("Listening on: {}", listener.local_addr()?);
+    println!("{}", settings);
 
     loop {
         let (stream, _) = listener.clone().accept().await?;
@@ -43,7 +42,7 @@ pub async fn start(
                 )
                 .await
             {
-                error!("Error serving connection: {}", err);
+                eprintln!("Error serving connection: {}", err);
             }
         });
     }
@@ -68,7 +67,7 @@ async fn handle(
 
     tokio::task::spawn(async move {
         if let Err(err) = connection.await {
-            error!("Unable to establish connection: {:?}", err);
+            eprintln!("Unable to establish connection: {:?}", err);
         }
     });
 
@@ -83,12 +82,25 @@ async fn handle(
     let res = send_request(client, proxy_request).await?;
     let status = res.status().as_u16();
 
-    info!(
-        "{} {} {} => :{}{}",
-        status, request_method, request_uri, proxy.remote_port, proxy_uri
+    println!(
+        "{} {} {} \x1b[94m➡\x1b[0m :{}{}",
+        colourise_status(status),
+        request_method,
+        request_uri,
+        proxy.remote_port,
+        proxy_uri
     );
 
     Ok(res.map(|b| b.boxed()))
+}
+
+fn colourise_status(status_code: u16) -> String {
+    match status_code {
+        200..=399 => format!("\x1b[92m{}\x1b[0m", status_code),
+        400..=499 => format!("\x1b[93m{}\x1b[0m", status_code),
+        500..=599 => format!("\x1b[91m{}\x1b[0m", status_code),
+        _ => status_code.to_string(),
+    }
 }
 
 pub fn build_request(
