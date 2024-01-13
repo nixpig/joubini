@@ -31,6 +31,7 @@ struct FormData {
 //   -> TODO: e.g. test basic auth?
 //   -> TODO: e.g. test bearer auth?
 // TODO: test all HTTP methods work correctly
+// TODO: test common response codes
 // TODO: test multipart/form-data
 
 #[serial]
@@ -438,6 +439,49 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[serial]
+#[tokio::test]
+async fn test_response_codes() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3014")
+            .expect("Unable to parse proxy string")],
+    };
+
+    start_joubini(settings).await;
+    start_remote(3014, "/").await;
+
+    let client = reqwest::Client::new();
+
+    let res = client
+        .get("http://localhost:7878/302")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::TEMPORARY_REDIRECT);
+
+    let res = client
+        .get("http://localhost:7878/500")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let res = client
+        .get("http://localhost:7878/404")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    Ok(())
+}
+
 async fn start_joubini(settings: Settings) {
     let listener = Arc::new(
         tokio::net::TcpListener::bind(format!(
@@ -470,12 +514,27 @@ async fn start_remote(port: u16, path: &'static str) {
             .route("/form-post", web::post().to(post_form_ok))
             .route("/add-forwarded", web::get().to(add_forwarded_ok))
             .route("/append-forwarded", web::get().to(append_forwarded_ok))
+            .route("/302", web::get().to(handler_302))
+            .route("/404", web::get().to(handler_404))
+            .route("/500", web::get().to(handler_500))
     })
     .listen(listener)
     .expect("Unable to start remote server")
     .run();
 
     tokio::spawn(server);
+}
+
+async fn handler_302() -> HttpResponse {
+    HttpResponse::TemporaryRedirect().finish()
+}
+
+async fn handler_404() -> HttpResponse {
+    HttpResponse::NotFound().finish()
+}
+
+async fn handler_500() -> HttpResponse {
+    HttpResponse::InternalServerError().finish()
 }
 
 async fn get_ok() -> HttpResponse {
