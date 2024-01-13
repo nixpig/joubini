@@ -1,7 +1,9 @@
 use crate::error::Error;
 use crate::{cli::Cli, error::ParseError};
 use clap::Parser;
+use std::ffi::OsString;
 use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
+use tracing::debug;
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
@@ -91,7 +93,7 @@ impl FromStr for ProxyConfig {
                 remote_path: ["/", remote_path].join(""),
             })
         } else {
-            Err(Error::ParseError(ParseError::CliConfig))
+            Err(Error::ParseError(ParseError::ProxyDefinition))
         }
     }
 }
@@ -100,20 +102,18 @@ impl TryFrom<Cli> for Settings {
     type Error = Error;
 
     fn try_from(value: Cli) -> Result<Self, Self::Error> {
-        match value
+        let proxies = value
             .proxies
             .iter()
             .map(|p| ProxyConfig::from_str(p))
-            .collect::<Result<Vec<ProxyConfig>, Error>>()
-        {
-            Ok(proxies) => Ok(Settings {
-                host: value.host,
-                local_port: value.local_port,
-                proxies,
-                config: value.config,
-            }),
-            Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
-        }
+            .collect::<Result<Vec<ProxyConfig>, Error>>()?;
+
+        Ok(Settings {
+            host: value.host,
+            local_port: value.local_port,
+            proxies,
+            config: value.config,
+        })
     }
 }
 
@@ -143,32 +143,32 @@ impl TryFrom<PathBuf> for Settings {
         let config_str = fs::read_to_string(&path)?;
         let config_yaml: ConfigFileProxies = serde_yaml::from_str(&config_str)?;
 
-        match config_yaml
+        let proxies = config_yaml
             .proxies
             .iter()
             .map(|p| ProxyConfig::from_str(p))
-            .collect::<Result<Vec<ProxyConfig>, Error>>()
-        {
-            Ok(proxies) => Ok(Settings {
-                host: config_yaml.host,
-                local_port: config_yaml.local_port,
-                proxies,
-                config: Some(path),
-            }),
-            Err(_) => Err(Error::ParseError(ParseError::FileConfig)),
-        }
+            .collect::<Result<Vec<ProxyConfig>, Error>>()?;
+
+        Ok(Settings {
+            host: config_yaml.host,
+            local_port: config_yaml.local_port,
+            proxies,
+            config: Some(path),
+        })
     }
 }
 
-pub fn get_settings() -> Result<Settings, Error> {
-    let mut cli_settings: Settings = Cli::parse().try_into()?;
+pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
+    let mut cli_settings: Settings = Cli::parse_from(cli_args).try_into()?;
+    debug!("cli_settings: {}", cli_settings);
 
     if let Some(config_file) = &cli_settings.config {
         let mut file_settings = Settings::try_from(PathBuf::from(config_file))?;
+        debug!("file_settings: {}", file_settings);
 
         Ok(Settings::new()
-            .merge(&mut file_settings)
-            .merge(&mut cli_settings))
+            .merge(&mut cli_settings)
+            .merge(&mut file_settings))
     } else {
         Ok(cli_settings)
     }
