@@ -53,11 +53,12 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
-    let proxy = get_proxy(req.uri().to_string(), &settings.proxies)?;
+    let proxy = get_proxy(req.uri().to_string(), &settings.proxies)
+        .ok_or(Error::ProxyError(ProxyError::NoProxy))?;
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
-    let stream = TcpStream::connect(addr).await.unwrap();
+    let stream = TcpStream::connect(addr).await?;
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
@@ -75,19 +76,16 @@ async fn handle(
     let request_method = req.method().clone();
 
     let proxy_request =
-        build_request(req, &settings.host, settings.local_port, proxy).unwrap();
+        build_request(req, &settings.host, settings.local_port, proxy)?;
 
     let proxy_uri = proxy_request.uri().clone();
 
     let res = send_request(client, proxy_request).await?;
+    let status = res.status().as_u16();
 
     info!(
         "{} {} {} => :{}{}",
-        res.status().as_u16(),
-        request_method,
-        request_uri,
-        proxy.remote_port,
-        proxy_uri
+        status, request_method, request_uri, proxy.remote_port, proxy_uri
     );
 
     Ok(res.map(|b| b.boxed()))
@@ -106,13 +104,10 @@ pub fn build_request(
     add_x_forwarded_for_header(req.headers_mut(), &local_addr)?;
     add_host_header(req.headers_mut(), &remote_addr)?;
 
-    match map_proxy_uri(req.uri(), proxy) {
-        Ok(v) => {
-            *req.uri_mut() = v;
-            Ok(req)
-        }
-        Err(_) => Err(Error::ProxyError(ProxyError::MapFailed)),
-    }
+    let mapped_uri = map_proxy_uri(req.uri(), proxy)?;
+    *req.uri_mut() = mapped_uri;
+
+    Ok(req)
 }
 
 pub async fn send_request(
@@ -168,14 +163,8 @@ fn add_host_header(
     Ok(())
 }
 
-fn get_proxy(
-    req_uri: String,
-    proxies: &[ProxyConfig],
-) -> Result<&ProxyConfig, Error> {
-    match proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path)) {
-        Some(v) => Ok(v),
-        None => Err(Error::ProxyError(ProxyError::NoProxy)),
-    }
+fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> Option<&ProxyConfig> {
+    proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path))
 }
 
 fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {

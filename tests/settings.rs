@@ -67,11 +67,6 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
         }
     );
 
-    let p6 = "invalid proxy config";
-    let o6 = ProxyConfig::from_str(p6);
-
-    assert!(o6.is_err());
-
     Ok(())
 }
 
@@ -307,6 +302,90 @@ fn test_create_default_settings() -> Result<(), Box<dyn Error>> {
             proxies: vec![]
         }
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_fail_parsing_empty_config_file() -> Result<(), Box<dyn Error>> {
+    let config_file = PathBuf::from_str("tests/empty-config.yml")?;
+
+    let settings = Settings::try_from(config_file);
+
+    assert!(settings.is_err());
+
+    Ok(())
+}
+
+#[test]
+fn test_print_settings() -> Result<(), Box<dyn Error>> {
+    let mut settings = Settings::default();
+
+    settings
+        .proxies
+        .push(ProxyConfig::from_str("foo:3000/bar").unwrap());
+
+    settings
+        .proxies
+        .push(ProxyConfig::from_str("baz:3001/qux").unwrap());
+
+    assert_eq!(format!("{}", settings), "\nProxy: localhost:80/foo => :3000/bar\nProxy: localhost:80/baz => :3001/qux");
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_proxy_config() -> Result<(), Box<dyn Error>> {
+    let p = "invalid proxy config";
+    let o = ProxyConfig::from_str(p).unwrap_err().to_string();
+
+    assert_eq!(
+        o,
+        String::from("Parse error: Unable to parse proxy definition.")
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_fail_invalid_port() -> Result<(), Box<dyn Error>> {
+    let p1 = ":foo";
+    let p2 = ":bar/baz";
+    let p3 = "qux:thud/fred";
+
+    let c1 = ProxyConfig::from_str(p1).unwrap_err().to_string();
+    let c2 = ProxyConfig::from_str(p2).unwrap_err().to_string();
+    let c3 = ProxyConfig::from_str(p3).unwrap_err().to_string();
+
+    assert_eq!(
+        c1,
+        String::from(
+            "Parse error: Parse int error: invalid digit found in string"
+        )
+    );
+    assert_eq!(
+        c2,
+        String::from(
+            "Parse error: Parse int error: invalid digit found in string"
+        )
+    );
+    assert_eq!(
+        c3,
+        String::from(
+            "Parse error: Parse int error: invalid digit found in string"
+        )
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_missing_config_file() -> Result<(), Box<dyn Error>> {
+    let settings = Settings::try_from(PathBuf::from("tests/missing.yml"));
+
+    let err = settings.unwrap_err().to_string();
+
+    assert_eq!(err, String::from("IO error: Standard IO error: No such file or directory (os error 2)"));
 
     Ok(())
 }

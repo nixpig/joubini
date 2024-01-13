@@ -91,7 +91,7 @@ impl FromStr for ProxyConfig {
                 remote_path: ["/", remote_path].join(""),
             })
         } else {
-            Err(Error::ParseError(ParseError::CliConfig))
+            Err(Error::ParseError(ParseError::ProxyDefinition))
         }
     }
 }
@@ -100,20 +100,18 @@ impl TryFrom<Cli> for Settings {
     type Error = Error;
 
     fn try_from(value: Cli) -> Result<Self, Self::Error> {
-        match value
+        let proxies = value
             .proxies
             .iter()
             .map(|p| ProxyConfig::from_str(p))
-            .collect::<Result<Vec<ProxyConfig>, Error>>()
-        {
-            Ok(proxies) => Ok(Settings {
-                host: value.host,
-                local_port: value.local_port,
-                proxies,
-                config: value.config,
-            }),
-            Err(_) => Err(Error::ParseError(ParseError::CliConfig)),
-        }
+            .collect::<Result<Vec<ProxyConfig>, Error>>()?;
+
+        Ok(Settings {
+            host: value.host,
+            local_port: value.local_port,
+            proxies,
+            config: value.config,
+        })
     }
 }
 
@@ -143,20 +141,18 @@ impl TryFrom<PathBuf> for Settings {
         let config_str = fs::read_to_string(&path)?;
         let config_yaml: ConfigFileProxies = serde_yaml::from_str(&config_str)?;
 
-        match config_yaml
+        let proxies = config_yaml
             .proxies
             .iter()
             .map(|p| ProxyConfig::from_str(p))
-            .collect::<Result<Vec<ProxyConfig>, Error>>()
-        {
-            Ok(proxies) => Ok(Settings {
-                host: config_yaml.host,
-                local_port: config_yaml.local_port,
-                proxies,
-                config: Some(path),
-            }),
-            Err(_) => Err(Error::ParseError(ParseError::FileConfig)),
-        }
+            .collect::<Result<Vec<ProxyConfig>, Error>>()?;
+
+        Ok(Settings {
+            host: config_yaml.host,
+            local_port: config_yaml.local_port,
+            proxies,
+            config: Some(path),
+        })
     }
 }
 

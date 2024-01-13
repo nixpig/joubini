@@ -1,4 +1,5 @@
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::http::header;
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use joubini::server::start;
 use joubini::settings::{ProxyConfig, Settings};
 use reqwest::StatusCode;
@@ -22,6 +23,35 @@ struct PostData {
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 struct FormData {
     form_key: String,
+}
+
+// TODO: test host header updated correctly
+// TODO: test hop-by-hop headers are stripped correctly
+// TODO: test other headers from original request persist through:
+//   -> TODO: e.g. test basic auth?
+//   -> TODO: e.g. test bearer auth?
+// TODO: test all HTTP methods work correctly
+// TODO: test multipart/form-data
+
+#[serial]
+#[tokio::test]
+async fn test_fail_when_no_remote_server() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3011").unwrap()],
+    };
+
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let res = client.get("http://localhost:7878").send().await;
+
+    assert!(res.is_err());
+
+    Ok(())
 }
 
 #[serial]
@@ -106,23 +136,6 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-// #[serial]
-// #[should_panic]
-// #[tokio::test]
-// async fn test_fail_when_no_remote_server() {
-//     let settings = Settings {
-//         host: String::from("localhost"),
-//         local_port: 7878,
-//         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
-//     };
-//
-//     start_joubini(settings).await;
-//
-//     let client = reqwest::Client::new();
-//
-//     let _ = client.get("http://localhost:7878").send().await;
-// }
 
 #[serial]
 #[tokio::test]
@@ -374,12 +387,56 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// TODO: test host header updated correctly
-// TODO: test x-forwarded-for header updated correctly - single and multiple
-// TODO: test hop-by-hop headers are stripped correctly
-// TODO: test basic auth
-// TODO: test all HTTP methods work correctly
-// TODO: test multipart/form-data
+#[serial]
+#[tokio::test]
+async fn test_add_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3012")
+            .expect("Unable to parse proxy string")],
+    };
+
+    start_joubini(settings).await;
+    start_remote(3012, "/").await;
+
+    let res = reqwest::get("http://localhost:7878/add-forwarded")
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+
+    Ok(())
+}
+
+#[serial]
+#[tokio::test]
+async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3013")
+            .expect("Unable to parse proxy string")],
+    };
+
+    start_joubini(settings).await;
+    start_remote(3013, "/").await;
+
+    let client = reqwest::Client::new();
+
+    let res = client
+        .get("http://localhost:7878/append-forwarded")
+        .header(header::X_FORWARDED_FOR, "first:2323")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+
+    Ok(())
+}
 
 async fn start_joubini(settings: Settings) {
     let listener = Arc::new(
@@ -411,6 +468,8 @@ async fn start_remote(port: u16, path: &'static str) {
             .route(path, web::get().to(get_ok))
             .route("/json-post", web::post().to(post_json_ok))
             .route("/form-post", web::post().to(post_form_ok))
+            .route("/add-forwarded", web::get().to(add_forwarded_ok))
+            .route("/append-forwarded", web::get().to(append_forwarded_ok))
     })
     .listen(listener)
     .expect("Unable to start remote server")
@@ -448,5 +507,26 @@ async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
         HttpResponse::Ok().json(&form_ok)
     } else {
         HttpResponse::InternalServerError().into()
+    }
+}
+
+async fn add_forwarded_ok(req: HttpRequest) -> HttpResponse {
+    let x_forwarded_for_header = req.headers().get(header::X_FORWARDED_FOR);
+
+    if x_forwarded_for_header.is_some_and(|h| h == "localhost:7878") {
+        HttpResponse::Ok().finish()
+    } else {
+        HttpResponse::ImATeapot().finish()
+    }
+}
+
+async fn append_forwarded_ok(req: HttpRequest) -> HttpResponse {
+    let x_forwarded_for_header = req.headers().get(header::X_FORWARDED_FOR);
+
+    if x_forwarded_for_header.is_some_and(|h| h == "first:2323, localhost:7878")
+    {
+        HttpResponse::Ok().finish()
+    } else {
+        HttpResponse::ImATeapot().finish()
     }
 }

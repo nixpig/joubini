@@ -3,7 +3,6 @@ use std::fmt::Display;
 #[derive(Debug)]
 pub enum ProxyError {
     NoProxy,
-    MapFailed,
     InvalidUri(hyper::http::uri::InvalidUri),
     InvalidHeader(hyper::header::InvalidHeaderValue),
     RequestFailed(hyper::Error),
@@ -14,9 +13,6 @@ impl Display for ProxyError {
         match self {
             ProxyError::NoProxy => {
                 write!(f, "No proxy found.")
-            }
-            ProxyError::MapFailed => {
-                write!(f, "Mapping failed.")
             }
             ProxyError::InvalidUri(ref e) => {
                 write!(f, "Invalid URI error: {}", e)
@@ -46,54 +42,26 @@ impl Display for IoError {
     }
 }
 
-impl From<std::io::Error> for IoError {
-    fn from(value: std::io::Error) -> Self {
-        IoError::StdIo(value)
-    }
-}
-
 #[derive(Debug)]
 pub enum ParseError {
-    SerdeYaml(serde_yaml::Error),
     ParseInt(std::num::ParseIntError),
-    CliConfig,
-    FileConfig,
+    ProxyDefinition,
+    FileConfig(serde_yaml::Error),
 }
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::SerdeYaml(ref e) => {
-                write!(f, "Serde YAML parse error: {}", e)
-            }
             ParseError::ParseInt(ref e) => {
                 write!(f, "Parse int error: {}", e)
             }
-            ParseError::CliConfig => {
-                write!(f, "Unable to parse config from CLI arguments.")
+            ParseError::ProxyDefinition => {
+                write!(f, "Unable to parse proxy definition.")
             }
-            ParseError::FileConfig => {
-                write!(f, "Unable to parse config from config file.")
+            ParseError::FileConfig(ref e) => {
+                write!(f, "Unable to parse config from config file: {}", e)
             }
         }
-    }
-}
-
-impl From<serde_yaml::Error> for ParseError {
-    fn from(value: serde_yaml::Error) -> Self {
-        ParseError::SerdeYaml(value)
-    }
-}
-
-impl From<std::num::ParseIntError> for ParseError {
-    fn from(value: std::num::ParseIntError) -> Self {
-        ParseError::ParseInt(value)
-    }
-}
-
-impl From<hyper::http::uri::InvalidUri> for ProxyError {
-    fn from(value: hyper::http::uri::InvalidUri) -> Self {
-        ProxyError::InvalidUri(value)
     }
 }
 
@@ -136,7 +104,7 @@ impl From<std::io::Error> for Error {
 
 impl From<serde_yaml::Error> for Error {
     fn from(value: serde_yaml::Error) -> Self {
-        Error::ParseError(ParseError::SerdeYaml(value))
+        Error::ParseError(ParseError::FileConfig(value))
     }
 }
 
@@ -167,12 +135,4 @@ impl From<&'static dyn std::error::Error> for Error {
     }
 }
 
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        match self {
-            Error::IoError(ref e) => e.to_string().leak(),
-            Error::ParseError(ref e) => e.to_string().leak(),
-            Error::ProxyError(ref e) => e.to_string().leak(),
-        }
-    }
-}
+impl std::error::Error for Error {}
