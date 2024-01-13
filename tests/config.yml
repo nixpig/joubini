@@ -1,4 +1,4 @@
-local_port: 7878
+port: 7878
 proxies:
   - ":3000"
   - ":3000/api"

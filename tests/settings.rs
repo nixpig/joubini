@@ -324,7 +324,8 @@ fn test_print_settings() -> Result<(), Box<dyn Error>> {
         .proxies
         .push(ProxyConfig::from_str("baz:3001/qux").unwrap());
 
-    assert_eq!(format!("{}", settings), "\nProxy: localhost:80/foo => :3000/bar\nProxy: localhost:80/baz => :3001/qux");
+    assert_eq!(settings.to_string(),
+                    String::from("\n\x1b[95mᴥ\x1b[0m localhost:80/foo \x1b[94m➡\x1b[0m :3000/bar\n\x1b[95mᴥ\x1b[0m localhost:80/baz \x1b[94m➡\x1b[0m :3001/qux\n"));
 
     Ok(())
 }
