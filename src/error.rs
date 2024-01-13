@@ -126,13 +126,4 @@ impl From<hyper::Error> for Error {
     }
 }
 
-impl From<&'static dyn std::error::Error> for Error {
-    fn from(value: &'static dyn std::error::Error) -> Self {
-        Error::IoError(IoError::StdIo(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            value.to_string(),
-        )))
-    }
-}
-
 impl std::error::Error for Error {}

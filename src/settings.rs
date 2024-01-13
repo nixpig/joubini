@@ -1,7 +1,9 @@
 use crate::error::Error;
 use crate::{cli::Cli, error::ParseError};
 use clap::Parser;
+use std::ffi::OsString;
 use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
+use tracing::debug;
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
@@ -156,15 +158,17 @@ impl TryFrom<PathBuf> for Settings {
     }
 }
 
-pub fn get_settings() -> Result<Settings, Error> {
-    let mut cli_settings: Settings = Cli::parse().try_into()?;
+pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
+    let mut cli_settings: Settings = Cli::parse_from(cli_args).try_into()?;
+    debug!("cli_settings: {}", cli_settings);
 
     if let Some(config_file) = &cli_settings.config {
         let mut file_settings = Settings::try_from(PathBuf::from(config_file))?;
+        debug!("file_settings: {}", file_settings);
 
         Ok(Settings::new()
-            .merge(&mut file_settings)
-            .merge(&mut cli_settings))
+            .merge(&mut cli_settings)
+            .merge(&mut file_settings))
     } else {
         Ok(cli_settings)
     }

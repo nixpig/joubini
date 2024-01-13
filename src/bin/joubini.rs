@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
         .with_span_events(FmtSpan::CLOSE)
         .init();
 
-    match get_settings() {
+    match get_settings(std::env::args_os().collect()) {
         Ok(settings) => {
             let settings = Arc::new(settings);
 

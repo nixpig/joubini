@@ -1,8 +1,8 @@
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{error::Error, ffi::OsString, path::PathBuf, str::FromStr};
 
 use joubini::{
     cli::Cli,
-    settings::{ProxyConfig, Settings},
+    settings::{get_settings, ProxyConfig, Settings},
 };
 
 #[test]
@@ -269,11 +269,6 @@ fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// #[test]
-// fn test_get_settings() -> Result<(), Box<dyn Error>> {
-//     todo!()
-// }
-
 #[test]
 fn test_create_new_settings() -> Result<(), Box<dyn Error>> {
     let new_settings = Settings::new();
@@ -386,6 +381,84 @@ fn test_missing_config_file() -> Result<(), Box<dyn Error>> {
     let err = settings.unwrap_err().to_string();
 
     assert_eq!(err, String::from("IO error: Standard IO error: No such file or directory (os error 2)"));
+
+    Ok(())
+}
+
+#[test]
+fn test_get_settings_without_config_file() -> Result<(), Box<dyn Error>> {
+    let cli_args = vec![
+        OsString::from("empty first value to discard"),
+        OsString::from("--port=7878"),
+        OsString::from("--host=127.0.0.1"),
+        OsString::from("--proxy=:3000"),
+    ];
+
+    let settings = get_settings(cli_args)
+        .expect("Should be able to parse cli args to settings");
+
+    assert_eq!(
+        settings,
+        Settings {
+            config: None,
+            host: String::from("127.0.0.1"),
+            local_port: 7878,
+            proxies: vec![ProxyConfig {
+                local_path: String::from("/"),
+                remote_port: 3000,
+                remote_path: String::from("/")
+            }]
+        }
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_settings_with_config_file() -> Result<(), Box<dyn Error>> {
+    let cli_args = vec![
+        OsString::from("empty first value to discard"),
+        OsString::from("--config=tests/config.yml"),
+    ];
+
+    let settings = get_settings(cli_args)
+        .expect("Should be able to parse cli args to settings");
+
+    assert_eq!(
+        settings,
+        Settings {
+            config: Some(PathBuf::from("tests/config.yml")),
+            host: String::from("localhost"),
+            local_port: 7878,
+            proxies: vec![
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                },
+                ProxyConfig {
+                    local_path: String::from("/local/v1"),
+                    remote_port: 3000,
+                    remote_path: String::from("/remote/v1"),
+                }
+            ]
+        }
+    );
 
     Ok(())
 }
