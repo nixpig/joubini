@@ -130,7 +130,7 @@ struct ConfigFileProxies {
     #[serde(default = "default_host")]
     host: String,
 
-    #[serde(default = "default_port")]
+    #[serde(rename = "port", default = "default_port")]
     local_port: u16,
 
     proxies: Vec<String>,
