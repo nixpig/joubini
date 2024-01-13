@@ -1,5 +1,5 @@
 use crate::{
-    error::{Error, ProxyError},
+    error::Error,
     settings::{ProxyConfig, Settings},
 };
 use hyper::{
@@ -52,8 +52,7 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
-    let proxy = get_proxy(req.uri().to_string(), &settings.proxies)
-        .ok_or(Error::ProxyError(ProxyError::NoProxy))?;
+    let proxy = get_proxy(req.uri().to_string(), &settings.proxies);
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
@@ -175,8 +174,11 @@ fn add_host_header(
     Ok(())
 }
 
-fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> Option<&ProxyConfig> {
-    proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path))
+fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
+    proxies
+        .iter()
+        .rfind(|x| req_uri.starts_with(&x.local_path))
+        .unwrap()
 }
 
 fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {

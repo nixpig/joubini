@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum ProxyError {
-    NoProxy,
     InvalidUri(hyper::http::uri::InvalidUri),
     InvalidHeader(hyper::header::InvalidHeaderValue),
     RequestFailed(hyper::Error),
@@ -11,9 +10,6 @@ pub enum ProxyError {
 impl Display for ProxyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProxyError::NoProxy => {
-                write!(f, "No proxy found.")
-            }
             ProxyError::InvalidUri(ref e) => {
                 write!(f, "Invalid URI error: {}", e)
             }
