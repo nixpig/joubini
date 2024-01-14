@@ -2,20 +2,12 @@ use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum ProxyError {
-    InvalidUri(hyper::http::uri::InvalidUri),
-    InvalidHeader(hyper::header::InvalidHeaderValue),
     RequestFailed(hyper::Error),
 }
 
 impl Display for ProxyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProxyError::InvalidUri(ref e) => {
-                write!(f, "Invalid URI error: {}", e)
-            }
-            ProxyError::InvalidHeader(ref e) => {
-                write!(f, "Invalid header error: {}", e)
-            }
             ProxyError::RequestFailed(ref e) => {
                 write!(f, "Request failed: {}", e)
             }
@@ -101,18 +93,6 @@ impl From<std::io::Error> for Error {
 impl From<serde_yaml::Error> for Error {
     fn from(value: serde_yaml::Error) -> Self {
         Error::ParseError(ParseError::FileConfig(value))
-    }
-}
-
-impl From<hyper::http::uri::InvalidUri> for Error {
-    fn from(value: hyper::http::uri::InvalidUri) -> Self {
-        Error::ProxyError(ProxyError::InvalidUri(value))
-    }
-}
-
-impl From<hyper::header::InvalidHeaderValue> for Error {
-    fn from(value: hyper::header::InvalidHeaderValue) -> Self {
-        Error::ProxyError(ProxyError::InvalidHeader(value))
     }
 }
 

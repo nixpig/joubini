@@ -35,14 +35,14 @@ pub async fn start(
         let settings = settings.clone();
 
         tokio::task::spawn(async move {
-            if let Err(err) = server::conn::http1::Builder::new()
+            if let Err(e) = server::conn::http1::Builder::new()
                 .serve_connection(
                     io,
                     service_fn(move |req| handle(req, settings.clone())),
                 )
                 .await
             {
-                eprintln!("Error serving connection: {}", err);
+                eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
             }
         });
     }
@@ -65,8 +65,11 @@ async fn handle(
         .await?;
 
     tokio::task::spawn(async move {
-        if let Err(err) = connection.await {
-            eprintln!("Unable to establish connection: {:?}", err);
+        if let Err(e) = connection.await {
+            eprintln!(
+                "\x1b[31mERR\x1b[0m Unable to establish connection: {:?}",
+                e
+            );
         }
     });
 
@@ -151,12 +154,21 @@ fn add_x_forwarded_for_header(
 ) -> Result<(), Error> {
     match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
         hyper::header::Entry::Vacant(v) => {
-            v.insert(HeaderValue::from_str(local_addr)?);
+            v.insert(
+                HeaderValue::from_str(local_addr)
+                    .expect("`local_addr` should be valid as header value."),
+            );
         }
         hyper::header::Entry::Occupied(mut v) => {
             v.insert(HeaderValue::from_str(
-                &[v.get().to_str().unwrap(), local_addr].join(", "),
-            )?);
+                &[
+                    v.get()
+                        .to_str()
+                        .expect("Header valud to be parsable to string."),
+                    local_addr,
+                ]
+                .join(", "),
+            ).expect("Strings concatenated with a ', ' should be a valid header value."));
         }
     };
 
@@ -167,7 +179,8 @@ fn add_host_header(
     headers: &mut HeaderMap,
     remote_addr: &str,
 ) -> Result<(), Error> {
-    let host = HeaderValue::from_str(remote_addr)?;
+    let host = HeaderValue::from_str(remote_addr)
+        .expect("`remote_addr` should be valid as header value.");
 
     headers.insert(&*HOST_HEADER_NAME, host);
 
@@ -181,9 +194,10 @@ fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
         .unwrap()
 }
 
-fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
+pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
     Ok(req_uri
         .to_string()
         .replace(&proxy.local_path, &proxy.remote_path)
-        .parse::<hyper::Uri>()?)
+        .parse::<hyper::Uri>()
+        .unwrap())
 }

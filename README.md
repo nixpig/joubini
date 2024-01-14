@@ -7,11 +7,19 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ## ⚠️ WORK IN PROGRESS
 
+### todo!
+
+[ ] - Add support for TLS/SSl.
+[ ] - Add support for web sockets.
+[ ] - Add support for DNS resolution.
+
 **It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
 
 ## Features
 
 ![Screenshot of Joubini running as reverse proxy](screenshot.png)
+
+### Notes
 
 - The `ip:port` of the client is added to the `x-forwarded-for` header.
 - Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.

@@ -24,13 +24,13 @@ async fn main() -> Result<(), Error> {
                     start(listener.clone(), settings.clone()).await
                 }
                 Err(e) => {
-                    eprintln!("Unable to bind to local port");
+                    eprintln!("Unable to bind to local port: {}", e);
                     Err(Error::IoError(IoError::StdIo(e)))
                 }
             }
         }
         Err(e) => {
-            eprintln!("Unable to get settings");
+            eprintln!("Unable to get settings: {}", e);
             Err(e)
         }
     }

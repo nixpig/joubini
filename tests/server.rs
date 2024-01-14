@@ -1,5 +1,6 @@
 use actix_web::http::header::{self, HeaderMap};
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
+use hyper::Uri;
 use joubini::server::start;
 use joubini::settings::{ProxyConfig, Settings};
 use reqwest::header::HeaderName;
@@ -34,6 +35,17 @@ struct PostData {
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 struct FormData {
     form_key: String,
+}
+
+#[test]
+fn test_map_proxy_uri() -> Result<(), Box<dyn Error>> {
+    let proxy = ProxyConfig::from_str("foo:3000/baz")?;
+
+    let req_uri = Uri::from_static("/foo/bar");
+    let mapped_uri = joubini::server::map_proxy_uri(&req_uri, &proxy)?;
+    assert_eq!(mapped_uri, Uri::from_static("/baz/bar"));
+
+    Ok(())
 }
 
 #[serial]
