@@ -9,7 +9,7 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ### todo!
 
-- [ ] Add support for TLS/SSl.
+- [ ] Add support for TLS/SSL.
 - [ ] Add support for web sockets.
 - [ ] Add support for DNS resolution.
 
@@ -25,6 +25,36 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 - Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
 ### Examples
+
+#### Simple host to port mapping
+
+Proxy requests for `http://localhost` to `http://localhost:3000`
+
+```shell
+joubini -p ":3000"
+```
+
+#### Host path to port mapping
+
+Proxy requests for `http://localhost` to `http://localhost:3000`
+
+_and_ proxy requests for `http://localhost/api` to `http://localhost:3001`
+
+```shell
+joubini -p ":3000" -p "api:3001"
+```
+
+#### Host path to port and path mapping
+
+Proxy requests for `http://localhost` to `http://localhost:3000`
+
+_and_ proxy requests for `http://localhost/api` to `http://localhost:3001`
+
+_and_ proxy requests for `http://localhost/admin` to `http://localhost:3002/admin`
+
+```shell
+joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
+```
 
 ## Installation
 
