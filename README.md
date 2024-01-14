@@ -24,49 +24,6 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 - The `ip:port` of the client is added to the `x-forwarded-for` header.
 - Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
 
-### Examples
-
-Some common use cases are shown below. Combinations of these and other more complex use cases can be achieved, so see the more detailed documentation.
-
-#### Simple host to port mapping
-
-Proxy requests for `http://localhost/*` to `http://localhost:3000/*`
-
-```shell
-joubini -p ":3000"
-```
-
-#### Host path to port mapping
-
-Proxy requests for `http://localhost/api/*` to `http://localhost:3001/*`
-
-```shell
-joubini -p "api:3001"
-```
-
-#### Host path to port/path mapping
-
-Proxy requests for `http://localhost/admin/*` to `http://localhost:3002/admin/*`
-
-```shell
-joubini -p "admin:3002/admin"
-```
-
-#### Combine multiple configurations
-
-```shell
-joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
-```
-
-## Installation
-
-### Build from source
-
-1. `git clone https://github.com/nixpig/joubini.git`
-1. `cd joubini`
-1. `cargo build --release`
-1. `mv ./target/release/joubini ~/.local/bin/`
-
 ## Usage
 
 ```shell
@@ -114,6 +71,49 @@ proxies:
   - admin:3002/dashboard # http://localhost/admin -> http://localhost:3002/dashboard
   - db:5432 # http://localhost/db -> http://localhost:5432
 ```
+
+### Examples
+
+Some common use cases are shown below. Combinations of these and other more complex use cases can be achieved, so see the more detailed documentation.
+
+#### Simple host to port mapping
+
+Proxy requests for `http://localhost/*` to `http://localhost:3000/*`
+
+```shell
+joubini -p ":3000"
+```
+
+#### Host path to port mapping
+
+Proxy requests for `http://localhost/api/*` to `http://localhost:3001/*`
+
+```shell
+joubini -p "api:3001"
+```
+
+#### Host path to port/path mapping
+
+Proxy requests for `http://localhost/admin/*` to `http://localhost:3002/admin/*`
+
+```shell
+joubini -p "admin:3002/admin"
+```
+
+#### Combine multiple configurations
+
+```shell
+joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
+```
+
+## Installation
+
+### Build from source
+
+1. `git clone https://github.com/nixpig/joubini.git`
+1. `cd joubini`
+1. `cargo build --release`
+1. `mv ./target/release/joubini ~/.local/bin/`
 
 ## Motivation
 
