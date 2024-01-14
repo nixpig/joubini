@@ -46,10 +46,16 @@ joubini -p "api:3001"
 
 #### Host path to port/path mapping
 
-Proxy requests for `http://localhost/admin` to `http://localhost:3002/admin`
+Proxy requests for `http://localhost/admin/*` to `http://localhost:3002/admin/*`
 
 ```shell
 joubini -p "admin:3002/admin"
+```
+
+#### Combine multiple configurations
+
+```shell
+joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 ```
 
 ## Installation
