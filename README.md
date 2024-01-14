@@ -26,9 +26,11 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ### Examples
 
+Some common use cases are shown below. Combinations of these and other more complex use cases can be achieved, so see the more detailed documentation.
+
 #### Simple host to port mapping
 
-Proxy requests for `http://localhost` to `http://localhost:3000`
+Proxy requests for `http://localhost/*` to `http://localhost:3000/*`
 
 ```shell
 joubini -p ":3000"
@@ -36,24 +38,18 @@ joubini -p ":3000"
 
 #### Host path to port mapping
 
-Proxy requests for `http://localhost` to `http://localhost:3000`
-
-_and_ proxy requests for `http://localhost/api` to `http://localhost:3001`
+Proxy requests for `http://localhost/api/*` to `http://localhost:3001/*`
 
 ```shell
-joubini -p ":3000" -p "api:3001"
+joubini -p "api:3001"
 ```
 
-#### Host path to port and path mapping
+#### Host path to port/path mapping
 
-Proxy requests for `http://localhost` to `http://localhost:3000`
-
-_and_ proxy requests for `http://localhost/api` to `http://localhost:3001`
-
-_and_ proxy requests for `http://localhost/admin` to `http://localhost:3002/admin`
+Proxy requests for `http://localhost/admin` to `http://localhost:3002/admin`
 
 ```shell
-joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
+joubini -p "admin:3002/admin"
 ```
 
 ## Installation
