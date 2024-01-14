@@ -1,7 +1,8 @@
-use actix_web::http::header;
+use actix_web::http::header::{self, HeaderMap};
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use joubini::server::start;
 use joubini::settings::{ProxyConfig, Settings};
+use reqwest::header::HeaderName;
 use reqwest::StatusCode;
 use serial_test::serial;
 use std::collections::HashMap;
@@ -9,6 +10,16 @@ use std::error::Error;
 use std::net::TcpListener;
 use std::str::FromStr;
 use std::sync::Arc;
+
+static HOP_HEADERS: [HeaderName; 7] = [
+    HeaderName::from_static("keep-alive"),
+    header::PROXY_AUTHENTICATE,
+    header::PROXY_AUTHORIZATION,
+    header::TE,
+    header::TRAILER,
+    header::TRANSFER_ENCODING,
+    header::UPGRADE,
+];
 
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 struct ResponseData {
@@ -25,14 +36,41 @@ struct FormData {
     form_key: String,
 }
 
-// TODO: test host header updated correctly
-// TODO: test hop-by-hop headers are stripped correctly
-// TODO: test other headers from original request persist through:
-//   -> TODO: e.g. test basic auth?
-//   -> TODO: e.g. test bearer auth?
-// TODO: test all HTTP methods work correctly
-// TODO: test common response codes
-// TODO: test multipart/form-data
+#[serial]
+#[tokio::test]
+async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3015").unwrap()],
+    };
+
+    start_remote(3015, "/").await;
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let res = client
+        .get("http://localhost:7878/headers")
+        .header(header::HOST, "http://localhost")
+        .header("keep-alive", "true")
+        .header(header::PROXY_AUTHENTICATE, "")
+        .header(header::PROXY_AUTHORIZATION, "")
+        .header(header::TE, "")
+        .header(header::TRAILER, "")
+        .header(header::TRANSFER_ENCODING, "")
+        .header(header::UPGRADE, "")
+        .header("x-custom-header", "custom_header_value")
+        .send()
+        .await?;
+
+    // println!("res: {:#?}", res);
+    //
+    assert_eq!(res.status(), StatusCode::OK);
+
+    Ok(())
+}
 
 #[serial]
 #[tokio::test]
@@ -456,12 +494,12 @@ async fn test_response_codes() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let res = client
-        .get("http://localhost:7878/302")
+        .get("http://localhost:7878/301")
         .send()
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::TEMPORARY_REDIRECT);
+    assert_eq!(res.status(), StatusCode::MOVED_PERMANENTLY);
 
     let res = client
         .get("http://localhost:7878/500")
@@ -514,9 +552,10 @@ async fn start_remote(port: u16, path: &'static str) {
             .route("/form-post", web::post().to(post_form_ok))
             .route("/add-forwarded", web::get().to(add_forwarded_ok))
             .route("/append-forwarded", web::get().to(append_forwarded_ok))
-            .route("/302", web::get().to(handler_302))
+            .route("/301", web::get().to(handler_301))
             .route("/404", web::get().to(handler_404))
             .route("/500", web::get().to(handler_500))
+            .route("/headers", web::get().to(headers_ok))
     })
     .listen(listener)
     .expect("Unable to start remote server")
@@ -525,8 +564,8 @@ async fn start_remote(port: u16, path: &'static str) {
     tokio::spawn(server);
 }
 
-async fn handler_302() -> HttpResponse {
-    HttpResponse::TemporaryRedirect().finish()
+async fn handler_301() -> HttpResponse {
+    HttpResponse::MovedPermanently().finish()
 }
 
 async fn handler_404() -> HttpResponse {
@@ -539,6 +578,29 @@ async fn handler_500() -> HttpResponse {
 
 async fn get_ok() -> HttpResponse {
     HttpResponse::Ok().body("get_ok")
+}
+
+async fn headers_ok(req: HttpRequest) -> HttpResponse {
+    let headers: &HeaderMap = req.headers();
+
+    let hop_headers: Vec<&HeaderName> = HOP_HEADERS
+        .iter()
+        .filter(|h| headers.get(h.to_string()).is_some())
+        .collect();
+
+    if !hop_headers.is_empty() {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    if headers.get("x-custom-header").unwrap() != "custom_header_value" {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    if headers.get(header::HOST).unwrap() != "localhost:3015" {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    HttpResponse::Ok().finish()
 }
 
 async fn post_json_ok(body: web::Json<PostData>) -> HttpResponse {
