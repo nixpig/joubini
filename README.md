@@ -11,7 +11,6 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 - [ ] Add support for TLS/SSL.
 - [ ] Add support for web sockets.
-- [ ] Add support for DNS resolution.
 - [ ] Use a connection pool instead of recreating for every request.
 
 **It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
