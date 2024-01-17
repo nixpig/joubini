@@ -35,7 +35,7 @@ A super-simple and minimally configurable HTTP reverse proxy for local developme
 Usage: joubini [OPTIONS]
 
 Options:
-  -H, --host <host>           Hostname or IP [default: localhost]
+  -H, --host <host>           Hostname or IP [default: 127.0.0.1]
   -P, --port <local_port>     Local port for reverse proxy server to listen on [default: 80]
   -p, --proxy <proxy_config>  Configuration for proxy in format '</local_path?><:remote_port!></remote_path?>'
   -c, --config <config_file>  Path to configuration file
@@ -67,10 +67,10 @@ Proxies defined in the config file follow the same pattern as via CLI, i.e.
 host: 127.0.0.1
 port: 80
 proxies:
-  - :3000 # http://localhost -> http://localhost:3000
-  - api:3001/api # http://localhost/api -> http://localhost:3001/api
-  - admin:3002/dashboard # http://localhost/admin -> http://localhost:3002/dashboard
-  - db:5432 # http://localhost/db -> http://localhost:5432
+  - :3000 # http://127.0.0.1 -> http://127.0.0.1:3000
+  - api:3001/api # http://127.0.0.1/api -> http://127.0.0.1:3001/api
+  - admin:3002/dashboard # http://127.0.0.1/admin -> http://127.0.0.1:3002/dashboard
+  - db:5432 # http://127.0.0.1/db -> http://127.0.0.1:5432
 ```
 
 ### Examples
@@ -79,7 +79,7 @@ Some common use cases are shown below. Combinations of these and other more comp
 
 #### Simple host to port mapping
 
-Proxy requests for `http://localhost/*` to `http://localhost:3000/*`
+Proxy requests for `http://127.0.0.1/*` to `http://127.0.0.1:3000/*`
 
 ```shell
 joubini -p ":3000"
@@ -87,7 +87,7 @@ joubini -p ":3000"
 
 #### Host path to port mapping
 
-Proxy requests for `http://localhost/api/*` to `http://localhost:3001/*`
+Proxy requests for `http://127.0.0.1/api/*` to `http://127.0.0.1:3001/*`
 
 ```shell
 joubini -p "api:3001"
@@ -95,7 +95,7 @@ joubini -p "api:3001"
 
 #### Host path to port/path mapping
 
-Proxy requests for `http://localhost/admin/*` to `http://localhost:3002/admin/*`
+Proxy requests for `http://127.0.0.1/admin/*` to `http://127.0.0.1:3002/admin/*`
 
 ```shell
 joubini -p "admin:3002/admin"

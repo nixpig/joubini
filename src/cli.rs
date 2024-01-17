@@ -12,7 +12,7 @@ pub struct Cli {
         long = "host",
         name = "host",
         help = "Hostname or IP",
-        default_value = "localhost"
+        default_value = "127.0.0.1"
     )]
     pub host: String,
 

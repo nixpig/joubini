@@ -15,7 +15,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 80,
             proxies: vec![],
             config: None,
@@ -117,7 +117,7 @@ impl TryFrom<Cli> for Settings {
 }
 
 fn default_host() -> String {
-    String::from("localhost")
+    String::from("127.0.0.1")
 }
 
 fn default_port() -> u16 {

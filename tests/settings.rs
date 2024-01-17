@@ -81,7 +81,7 @@ fn test_parse_settings_from_config_file_with_optional_fields(
         settings,
         Settings {
             config: Some(PathBuf::from("tests/config.yml")),
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 7878,
             proxies: vec![
                 ProxyConfig {
@@ -128,7 +128,7 @@ fn test_parse_settings_from_config_file_without_optional_fields(
         settings,
         Settings {
             config: Some(PathBuf::from("tests/config-without-options.yml")),
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 80,
             proxies: vec![
                 ProxyConfig {
@@ -276,7 +276,7 @@ fn test_create_new_settings() -> Result<(), Box<dyn Error>> {
         new_settings,
         Settings {
             config: None,
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 80,
             proxies: vec![]
         }
@@ -292,7 +292,7 @@ fn test_create_default_settings() -> Result<(), Box<dyn Error>> {
         default_settings,
         Settings {
             config: None,
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 80,
             proxies: vec![]
         }
@@ -325,7 +325,7 @@ fn test_print_settings() -> Result<(), Box<dyn Error>> {
         .push(ProxyConfig::from_str("baz:3001/qux").unwrap());
 
     assert_eq!(settings.to_string(),
-                    String::from("\n\x1b[95mᴥ\x1b[0m localhost:80/foo \x1b[94m➡\x1b[0m :3000/bar\n\x1b[95mᴥ\x1b[0m localhost:80/baz \x1b[94m➡\x1b[0m :3001/qux\n"));
+                    String::from("\n\x1b[95mᴥ\x1b[0m 127.0.0.1:80/foo \x1b[94m➡\x1b[0m :3000/bar\n\x1b[95mᴥ\x1b[0m 127.0.0.1:80/baz \x1b[94m➡\x1b[0m :3001/qux\n"));
 
     Ok(())
 }
@@ -429,7 +429,7 @@ fn test_settings_with_config_file() -> Result<(), Box<dyn Error>> {
         settings,
         Settings {
             config: Some(PathBuf::from("tests/config.yml")),
-            host: String::from("localhost"),
+            host: String::from("127.0.0.1"),
             local_port: 7878,
             proxies: vec![
                 ProxyConfig {
