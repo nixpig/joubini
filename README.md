@@ -110,10 +110,17 @@ joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 
 ### Build from source
 
+1. Install the Rust toolchain ([instructions](https://rustup.rs/))
 1. `git clone https://github.com/nixpig/joubini.git`
 1. `cd joubini`
 1. `cargo build --release`
 1. `mv ./target/release/joubini ~/.local/bin/`
+
+### Using TLS (aka SSL, aka HTTPS) on `localhost`
+
+1. Create a new CA and generate certificates using the included script: `bash -c scripts/ca.sh`
+1. Specify the `localhost.crt` and `localhost.key` when configuring `joubini`
+1. In Chrome, add the `myCA.pem` under `chrome://settings/certificates` -> Authorities
 
 ## Motivation
 

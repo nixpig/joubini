@@ -7,8 +7,10 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     HeaderMap, Uri,
 };
+use hyper_util::{rt::TokioExecutor, server::conn::auto};
 use lazy_static::lazy_static;
-use std::sync::Arc;
+use native_tls::Identity;
+use std::{fs, sync::Arc};
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -17,7 +19,7 @@ lazy_static! {
 }
 
 use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{body::Incoming, server, service::service_fn, Request, Response};
+use hyper::{body::Incoming, service::service_fn, Request, Response};
 use tokio::net::{TcpListener, TcpStream};
 
 pub async fn start(
@@ -27,20 +29,35 @@ pub async fn start(
     println!("Listening on: {}", listener.local_addr()?);
     println!("{}", settings);
 
+    let pem = fs::read("localhost.crt").unwrap();
+    let key = fs::read("localhost.key").unwrap();
+
+    let cert = Identity::from_pkcs8(&pem, &key).unwrap();
+
+    let tls_acceptor = native_tls::TlsAcceptor::builder(cert).build().unwrap();
+    let tls_acceptor = tokio_native_tls::TlsAcceptor::from(tls_acceptor);
+
     loop {
-        let (stream, _) = listener.clone().accept().await?;
-
-        let io = hyper_util::rt::TokioIo::new(stream);
-
         let settings = settings.clone();
 
+        let (stream, _) = listener.clone().accept().await?;
+
+        let tls_acceptor = tls_acceptor.clone();
+
         tokio::task::spawn(async move {
-            if let Err(e) = server::conn::http1::Builder::new()
-                .serve_connection(
-                    io,
-                    service_fn(move |req| handle(req, settings.clone())),
-                )
-                .await
+            let tls_stream =
+                tls_acceptor.accept(stream).await.expect("accept error");
+
+            let io = hyper_util::rt::TokioIo::new(tls_stream);
+
+            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
+                TokioExecutor::new(),
+            )
+            .serve_connection(
+                io,
+                service_fn(move |req| handle(req, settings.clone())),
+            )
+            .await
             {
                 eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
             }
@@ -52,6 +69,8 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
+    println!("REQUEST: \n{:#?}", req);
+
     let proxy = get_proxy(req.uri().to_string(), &settings.proxies);
 
     let addr = build_addr(&settings.host, proxy.remote_port);
@@ -59,6 +78,10 @@ async fn handle(
     let stream = TcpStream::connect(addr).await?;
 
     let io = hyper_util::rt::TokioIo::new(stream);
+
+    if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
+        println!("upgrade header: {:#?}", upgrade);
+    }
 
     let (client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)

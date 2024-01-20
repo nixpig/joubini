@@ -23,3 +23,13 @@ tarpaulin-report.html
 
 db.json
 
+# Certificate
+*.crt
+*.pem
+*.key
+*.cer
+*.der
+*.srl
+*.ext
+*.csr
+

@@ -10,6 +10,7 @@ pub struct Settings {
     pub local_port: u16,
     pub proxies: Vec<ProxyConfig>,
     pub config: Option<PathBuf>,
+    pub tls: bool,
 }
 
 impl Default for Settings {
@@ -19,6 +20,7 @@ impl Default for Settings {
             local_port: 80,
             proxies: vec![],
             config: None,
+            tls: false,
         }
     }
 }
@@ -60,6 +62,7 @@ impl Settings {
             local_port: other.local_port,
             proxies,
             config: other.config.clone(),
+            tls: other.tls,
         }
     }
 }
@@ -112,6 +115,7 @@ impl TryFrom<Cli> for Settings {
             local_port: value.local_port,
             proxies,
             config: value.config,
+            tls: value.tls,
         })
     }
 }
@@ -133,6 +137,8 @@ struct ConfigFileProxies {
     local_port: u16,
 
     proxies: Vec<String>,
+
+    tls: bool,
 }
 
 impl TryFrom<PathBuf> for Settings {
@@ -153,6 +159,7 @@ impl TryFrom<PathBuf> for Settings {
             local_port: config_yaml.local_port,
             proxies,
             config: Some(path),
+            tls: config_yaml.tls,
         })
     }
 }
