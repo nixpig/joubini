@@ -3,16 +3,18 @@
 
 # 🐙 joubini
 
-A super-simple and minimally configurable reverse HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
+A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
 
 ## ⚠️ WORK IN PROGRESS
+
+This is a **work in progress**. It's not stable, it's not secure, and performance isn't great.
+
+At this time, I wouldn't recommend using this for anything more than playing around. If you're looking for something production-ready, there are plenty of [good alternatives](#Alternatives) out there.
 
 ### todo!
 
 - [ ] Add support for web sockets.
 - [ ] Use a connection pool instead of recreating for every request?
-
-**It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
 
 ## Features
 
@@ -65,8 +67,11 @@ Proxies defined in the config file follow the same pattern as via CLI, i.e.
 
 ```yaml
 # joubini.yml
-host: 127.0.0.1
-port: 80
+port: 7878
+host: localhost
+tls: true
+pem: tests/ssl/localhost.crt
+key: tests/ssl/localhost.key
 proxies:
   - :3000 # http://127.0.0.1 -> http://127.0.0.1:3000
   - api:3001/api # http://127.0.0.1/api -> http://127.0.0.1:3001/api
@@ -80,7 +85,7 @@ Some common use cases are shown below. Combinations of these and other more comp
 
 #### Simple host to port mapping
 
-Proxy requests for `http://127.0.0.1/*` to `http://127.0.0.1:3000/*`
+`http://127.0.0.1/*` 🠮 `http://127.0.0.1:3000/*`
 
 ```shell
 joubini -p ":3000"
@@ -88,7 +93,7 @@ joubini -p ":3000"
 
 #### Host path to port mapping
 
-Proxy requests for `http://127.0.0.1/api/*` to `http://127.0.0.1:3001/*`
+`http://127.0.0.1/api/*` 🠮 `http://127.0.0.1:3001/*`
 
 ```shell
 joubini -p "api:3001"
@@ -96,7 +101,7 @@ joubini -p "api:3001"
 
 #### Host path to port/path mapping
 
-Proxy requests for `http://127.0.0.1/admin/*` to `http://127.0.0.1:3002/admin/*`
+`http://127.0.0.1/admin/*` 🠮 `http://127.0.0.1:3002/admin/*`
 
 ```shell
 joubini -p "admin:3002/admin"
@@ -112,13 +117,14 @@ joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 
 ```shell
 joubini \
-  -p ":3000" \
   --tls \
   --pem "path/to/cert.pem" \
-  --key "path/to/key.key"
+  --key "path/to/key.key" \
+  --host localhost \
+  --port ":3000"
 ```
 
-**Note:** see section below on generating a SSL certificate for `localhost` using the included shell script.
+**Note:** see section below on generating an SSL certificate for `localhost` using the included shell script.
 
 ## Installation
 
@@ -130,7 +136,7 @@ joubini \
 1. `cargo build --release`
 1. `mv ./target/release/joubini ~/.local/bin/`
 
-### Using TLS (aka SSL, aka HTTPS) on `localhost`
+### Using TLS (SSL) on `localhost`
 
 1. Create a new CA and generate certificates using the included script: `bash -c scripts/ca.sh`
 1. Specify the `localhost.crt` and `localhost.key` when configuring `joubini`
