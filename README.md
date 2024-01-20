@@ -122,6 +122,8 @@ joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 1. Specify the `localhost.crt` and `localhost.key` when configuring `joubini`
 1. In Chrome, add the `myCA.pem` under `chrome://settings/certificates` -> Authorities
 
+1. Trust certificate: `cp localhost.crt /etc/ca-certificates/trust-source/anchors/ && update-ca-trust extract`
+
 ## Motivation
 
 I just wanted an interesting little project to work on in Rust which involves some basic networking stuff and that would actually be useful.
