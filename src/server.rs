@@ -7,7 +7,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     HeaderMap, Uri,
 };
-use hyper_util::{rt::TokioExecutor, server::conn::auto};
+use hyper_util::rt::TokioExecutor;
 use lazy_static::lazy_static;
 use native_tls::Identity;
 use std::{fs, sync::Arc};
@@ -65,13 +65,24 @@ pub async fn start(
     }
 }
 
+async fn hello(
+    _: Request<hyper::body::Incoming>,
+) -> Result<
+    Response<http_body_util::Full<hyper::body::Bytes>>,
+    std::convert::Infallible,
+> {
+    Ok(Response::new(http_body_util::Full::new(
+        hyper::body::Bytes::from("Hello, World!"),
+    )))
+}
+
 async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     println!("REQUEST: \n{:#?}", req);
 
-    let proxy = get_proxy(req.uri().to_string(), &settings.proxies);
+    let proxy = get_proxy(req.uri().path().to_string(), &settings.proxies);
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
@@ -211,10 +222,15 @@ fn add_host_header(
 }
 
 fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
-    proxies
-        .iter()
-        .rfind(|x| req_uri.starts_with(&x.local_path))
-        .unwrap()
+    println!("\nreq_uri: {req_uri}");
+
+    println!("proxies: \n{:#?}", proxies);
+
+    let proxy = proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path));
+
+    println!("\nproxy: {:#?}", proxy);
+
+    proxy.unwrap()
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
