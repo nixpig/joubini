@@ -10,6 +10,9 @@ pub struct Settings {
     pub local_port: u16,
     pub proxies: Vec<ProxyConfig>,
     pub config: Option<PathBuf>,
+    pub tls: bool,
+    pub pem: Option<PathBuf>,
+    pub key: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -19,6 +22,9 @@ impl Default for Settings {
             local_port: 80,
             proxies: vec![],
             config: None,
+            tls: false,
+            pem: None,
+            key: None,
         }
     }
 }
@@ -60,6 +66,9 @@ impl Settings {
             local_port: other.local_port,
             proxies,
             config: other.config.clone(),
+            tls: other.tls,
+            pem: other.pem.clone(),
+            key: other.key.clone(),
         }
     }
 }
@@ -112,6 +121,9 @@ impl TryFrom<Cli> for Settings {
             local_port: value.local_port,
             proxies,
             config: value.config,
+            tls: value.tls,
+            pem: value.pem,
+            key: value.key,
         })
     }
 }
@@ -133,6 +145,10 @@ struct ConfigFileProxies {
     local_port: u16,
 
     proxies: Vec<String>,
+
+    tls: Option<bool>,
+    pem: Option<PathBuf>,
+    key: Option<PathBuf>,
 }
 
 impl TryFrom<PathBuf> for Settings {
@@ -148,11 +164,16 @@ impl TryFrom<PathBuf> for Settings {
             .map(|p| ProxyConfig::from_str(p))
             .collect::<Result<Vec<ProxyConfig>, Error>>()?;
 
+        let tls = config_yaml.tls.is_some();
+
         Ok(Settings {
             host: config_yaml.host,
             local_port: config_yaml.local_port,
             proxies,
             config: Some(path),
+            tls,
+            pem: config_yaml.pem,
+            key: config_yaml.key,
         })
     }
 }

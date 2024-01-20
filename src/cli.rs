@@ -34,10 +34,30 @@ pub struct Cli {
     pub proxies: Vec<String>,
 
     #[clap(
-        short = 'c',
+        short = 'C',
         long = "config",
         name = "config_file",
         help = "Path to configuration file"
     )]
     pub config: Option<PathBuf>,
+
+    #[clap(
+        short = 'T',
+        long = "tls",
+        default_value = "false",
+        help = "Serve over TLS"
+    )]
+    pub tls: bool,
+
+    #[clap(
+        long = "pem",
+        help = "Path to SSL certificate as `.pem` or `.crt`. Required if `--tls` flag is enabled."
+    )]
+    pub pem: Option<PathBuf>,
+
+    #[clap(
+        long = "key",
+        help = "Path to SSL certificate key as `.key`. Required if `--tls` flag is enabled."
+    )]
+    pub key: Option<PathBuf>,
 }
