@@ -83,19 +83,10 @@ fn spawn_regular_server(stream: TcpStream, settings: Arc<Settings>) {
                 service_fn(move |req| handle(req, settings.clone())),
             )
             .await
-        {}
+        {
+            eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
+        }
     });
-}
-
-async fn hello(
-    _: Request<hyper::body::Incoming>,
-) -> Result<
-    Response<http_body_util::Full<hyper::body::Bytes>>,
-    std::convert::Infallible,
-> {
-    Ok(Response::new(http_body_util::Full::new(
-        hyper::body::Bytes::from("Hello, World!"),
-    )))
 }
 
 async fn handle(
@@ -135,7 +126,9 @@ async fn handle(
 
     let proxy_uri = proxy_request.uri().clone();
 
+    println!("sending request");
     let res = send_request(client, proxy_request).await?;
+    println!("got response");
     let status = res.status().as_u16();
 
     println!(

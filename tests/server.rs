@@ -8,6 +8,7 @@ use reqwest::StatusCode;
 use serial_test::serial;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
 use std::net::TcpListener;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -545,6 +546,54 @@ async fn test_response_codes() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[serial]
+#[tokio::test]
+async fn test_tls_server() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        host: String::from("localhost"),
+        local_port: 7878,
+        proxies: vec![ProxyConfig::from_str(":3016").unwrap()],
+        config: None,
+        tls: true,
+    };
+
+    start_remote(3016, "/").await;
+    start_joubini(settings).await;
+
+    let pem = fs::read("localhost.crt").unwrap();
+    let key = fs::read("localhost.key").unwrap();
+    let root = fs::read("myCA.pem").unwrap();
+
+    let cert = reqwest::Identity::from_pkcs8_pem(&pem, &key)?;
+    let ca = reqwest::Certificate::from_pem(&root)?;
+
+    let client = reqwest::Client::builder()
+        .use_native_tls()
+        .identity(cert)
+        .add_root_certificate(ca)
+        .pool_max_idle_per_host(0)
+        .build()?;
+
+    let res = client.get("https://localhost:7878").send().await?;
+
+    let status = res.status();
+    assert_eq!(status, reqwest::StatusCode::OK);
+
+    let body = res.text().await?;
+    assert_eq!(body, "get_ok");
+
+    Ok(())
+}
+
+// TODO: http2
+// let client = reqwest::Client::builder()
+//     .use_native_tls()
+//     .identity(cert)
+//     .add_root_certificate(ca)
+//     .pool_max_idle_per_host(0)
+// .http2_prior_knowledge()
+//     .build()?;
 
 async fn start_joubini(settings: Settings) {
     let listener = Arc::new(
