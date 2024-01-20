@@ -39,6 +39,12 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
+      - name: Certs
+        run: |
+          apt-get install -y ca-certificates
+          cp tests/ssl/localhost.crt /usr/local/share/ca-certificates
+          update-ca-certificates
+
       - name: Test
         run: |
           cargo install cargo-tarpaulin \
