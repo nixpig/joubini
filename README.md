@@ -9,9 +9,8 @@ A super-simple and minimally configurable reverse HTTP reverse proxy for local d
 
 ### todo!
 
-- [ ] Add support for TLS/SSL.
 - [ ] Add support for web sockets.
-- [ ] Use a connection pool instead of recreating for every request.
+- [ ] Use a connection pool instead of recreating for every request?
 
 **It's probably not a good idea to actually use this for anything at this point. Maybe soon 🤷**
 
@@ -36,8 +35,11 @@ Usage: joubini [OPTIONS]
 Options:
   -H, --host <host>           Hostname or IP [default: 127.0.0.1]
   -P, --port <local_port>     Local port for reverse proxy server to listen on [default: 80]
-  -p, --proxy <proxy_config>  Configuration for proxy in format '</local_path?><:remote_port!></remote_path?>'
-  -c, --config <config_file>  Path to configuration file
+  -p, --proxy <proxy_config>  Configuration for proxy in format '<:local_port?></local_path?><:remote_port!></remote_path?>'
+  -C, --config <config_file>  Path to configuration file
+  -T, --tls                   Serve over TLS
+      --pem <PEM>             Path to SSL certificate as `.pem` or `.crt`. Required if `--tls` flag is enabled.
+      --key <KEY>             Path to SSL certificate key as `.key`. Required if `--tls` flag is enabled.
   -h, --help                  Print help
   -V, --version               Print version
 
@@ -106,6 +108,18 @@ joubini -p "admin:3002/admin"
 joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 ```
 
+#### Serve connection over TLS (SSL)
+
+```shell
+joubini \
+  -p ":3000" \
+  --tls \
+  --pem "path/to/cert.pem" \
+  --key "path/to/key.key"
+```
+
+**Note:** see section below on generating a SSL certificate for `localhost` using the included shell script.
+
 ## Installation
 
 ### Build from source
@@ -120,9 +134,8 @@ joubini -p ":3000" -p "api:3001" -p "admin:3002/admin"
 
 1. Create a new CA and generate certificates using the included script: `bash -c scripts/ca.sh`
 1. Specify the `localhost.crt` and `localhost.key` when configuring `joubini`
-1. In Chrome, add the `myCA.pem` under `chrome://settings/certificates` -> Authorities
-
 1. Trust certificate: `cp localhost.crt /etc/ca-certificates/trust-source/anchors/ && update-ca-trust extract`
+1. In Chrome, add the `myCA.pem` under `chrome://settings/certificates` -> Authorities
 
 ## Motivation
 
