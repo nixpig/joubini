@@ -5,12 +5,13 @@ use crate::{
 use hyper::{
     client::conn::http1::SendRequest,
     header::{HeaderName, HeaderValue},
-    HeaderMap, Uri,
+    server, HeaderMap, Uri,
 };
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use lazy_static::lazy_static;
 use native_tls::Identity;
 use std::{fs, sync::Arc};
+use tokio_native_tls::TlsAcceptor;
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -33,7 +34,6 @@ pub async fn start(
     let key = fs::read("localhost.key").unwrap();
 
     let cert = Identity::from_pkcs8(&pem, &key).unwrap();
-
     let tls_acceptor = native_tls::TlsAcceptor::builder(cert).build().unwrap();
     let tls_acceptor = tokio_native_tls::TlsAcceptor::from(tls_acceptor);
 
@@ -42,27 +42,49 @@ pub async fn start(
 
         let (stream, _) = listener.clone().accept().await?;
 
-        let tls_acceptor = tls_acceptor.clone();
+        match settings.tls {
+            true => spawn_tls_server(tls_acceptor.clone(), stream, settings),
+            false => spawn_regular_server(stream, settings),
+        }
+    }
+}
 
-        tokio::task::spawn(async move {
-            let tls_stream =
-                tls_acceptor.accept(stream).await.expect("accept error");
+fn spawn_tls_server(
+    tls_acceptor: TlsAcceptor,
+    stream: TcpStream,
+    settings: Arc<Settings>,
+) {
+    tokio::task::spawn(async move {
+        let tls_stream =
+            tls_acceptor.accept(stream).await.expect("accept error");
 
-            let io = hyper_util::rt::TokioIo::new(tls_stream);
+        let io = hyper_util::rt::TokioIo::new(tls_stream);
 
-            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
-                TokioExecutor::new(),
-            )
+        if let Err(e) =
+            hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
+                .serve_connection(
+                    io,
+                    service_fn(move |req| handle(req, settings.clone())),
+                )
+                .await
+        {
+            eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
+        }
+    });
+}
+
+fn spawn_regular_server(stream: TcpStream, settings: Arc<Settings>) {
+    tokio::task::spawn(async move {
+        let io = TokioIo::new(stream);
+
+        if let Err(e) = server::conn::http1::Builder::new()
             .serve_connection(
                 io,
                 service_fn(move |req| handle(req, settings.clone())),
             )
             .await
-            {
-                eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
-            }
-        });
-    }
+        {}
+    });
 }
 
 async fn hello(
@@ -80,8 +102,6 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
-    println!("REQUEST: \n{:#?}", req);
-
     let proxy = get_proxy(req.uri().path().to_string(), &settings.proxies);
 
     let addr = build_addr(&settings.host, proxy.remote_port);
@@ -122,9 +142,9 @@ async fn handle(
         "{} {} {} \x1b[94m➡\x1b[0m :{}{}",
         colourise_status(status),
         request_method,
-        request_uri,
+        request_uri.path(),
         proxy.remote_port,
-        proxy_uri
+        proxy_uri.path(),
     );
 
     Ok(res.map(|b| b.boxed()))
@@ -222,15 +242,10 @@ fn add_host_header(
 }
 
 fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
-    println!("\nreq_uri: {req_uri}");
-
-    println!("proxies: \n{:#?}", proxies);
-
-    let proxy = proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path));
-
-    println!("\nproxy: {:#?}", proxy);
-
-    proxy.unwrap()
+    proxies
+        .iter()
+        .rfind(|x| req_uri.starts_with(&x.local_path))
+        .unwrap()
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {

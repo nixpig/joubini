@@ -1,4 +1,6 @@
+host: localhost
 port: 7878
+tls: true
 proxies:
   - ":3000"
   - ":3000/api"
