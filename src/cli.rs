@@ -48,4 +48,16 @@ pub struct Cli {
         help = "Serve over TLS"
     )]
     pub tls: bool,
+
+    #[clap(
+        long = "pem",
+        help = "Path to SSL certificate as `.pem` or `.crt`. Required if `--tls` flag is enabled."
+    )]
+    pub pem: Option<PathBuf>,
+
+    #[clap(
+        long = "key",
+        help = "Path to SSL certificate key as `.key`. Required if `--tls` flag is enabled."
+    )]
+    pub key: Option<PathBuf>,
 }

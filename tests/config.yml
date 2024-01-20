@@ -1,6 +1,8 @@
 host: localhost
 port: 7878
 tls: true
+pem: tests/ssl/localhost.crt
+key: tests/ssl/localhost.key
 proxies:
   - ":3000"
   - ":3000/api"

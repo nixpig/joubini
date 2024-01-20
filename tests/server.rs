@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::net::TcpListener;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -57,6 +58,8 @@ async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3015").unwrap()],
     };
 
@@ -94,6 +97,8 @@ async fn test_fail_when_no_remote_server() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3011").unwrap()],
     };
 
@@ -116,6 +121,8 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3009").unwrap()],
     };
 
@@ -159,6 +166,8 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3010").unwrap()],
     };
 
@@ -201,6 +210,8 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3000").unwrap()],
     };
 
@@ -228,6 +239,8 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str("foo:3001")
             .expect("Unable to parse proxy string")],
     };
@@ -261,6 +274,8 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str("bar:3002/bar")
             .expect("Unable to parse proxy string")],
     };
@@ -294,6 +309,8 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str("baz:3003/qux")
             .expect("Unable to parse proxy string")],
     };
@@ -327,6 +344,8 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str("foo:3004/bar/baz/qux")
             .expect("Unable to parse proxy config from string")],
     };
@@ -360,6 +379,8 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str("foo/bar/baz:3005/qux")
             .expect("Unable to parse proxy settings from provided string")],
     };
@@ -393,6 +414,8 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![
             ProxyConfig::from_str("foo:3008/fred")
                 .expect("unable to parse proxy string"),
@@ -458,6 +481,8 @@ async fn test_add_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3012")
             .expect("Unable to parse proxy string")],
     };
@@ -482,6 +507,8 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3013")
             .expect("Unable to parse proxy string")],
     };
@@ -511,6 +538,8 @@ async fn test_response_codes() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost"),
         local_port: 7878,
         tls: false,
+        pem: None,
+        key: None,
         proxies: vec![ProxyConfig::from_str(":3014")
             .expect("Unable to parse proxy string")],
     };
@@ -556,14 +585,16 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
         proxies: vec![ProxyConfig::from_str(":3016").unwrap()],
         config: None,
         tls: true,
+        pem: Some(PathBuf::from_str("tests/ssl/localhost.crt").unwrap()),
+        key: Some(PathBuf::from_str("tests/ssl/localhost.key").unwrap()),
     };
 
     start_remote(3016, "/").await;
     start_joubini(settings).await;
 
-    let pem = fs::read("localhost.crt").unwrap();
-    let key = fs::read("localhost.key").unwrap();
-    let root = fs::read("myCA.pem").unwrap();
+    let pem = fs::read("tests/ssl/localhost.crt").unwrap();
+    let key = fs::read("tests/ssl/localhost.key").unwrap();
+    let root = fs::read("tests/ssl/myCA.pem").unwrap();
 
     let cert = reqwest::Identity::from_pkcs8_pem(&pem, &key)?;
     let ca = reqwest::Certificate::from_pem(&root)?;

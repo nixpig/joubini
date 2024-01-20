@@ -4,4 +4,3 @@ proxies:
   - "api:3000"
   - "api:3000/api"
   - "local/v1:3000/remote/v1"
-tls: false

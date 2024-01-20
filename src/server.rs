@@ -10,7 +10,7 @@ use hyper::{
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use lazy_static::lazy_static;
 use native_tls::Identity;
-use std::{fs, sync::Arc};
+use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use tokio_native_tls::TlsAcceptor;
 
 lazy_static! {
@@ -30,22 +30,42 @@ pub async fn start(
     println!("Listening on: {}", listener.local_addr()?);
     println!("{}", settings);
 
-    let pem = fs::read("localhost.crt").unwrap();
-    let key = fs::read("localhost.key").unwrap();
+    match settings.tls {
+        true => {
+            println!("read PEM");
+            let pem = fs::read(
+                settings
+                    .pem
+                    .as_ref()
+                    .unwrap_or(&PathBuf::from_str("").unwrap()),
+            )?;
+            println!("read KEY");
+            let key = fs::read(
+                settings
+                    .key
+                    .as_ref()
+                    .unwrap_or(&PathBuf::from_str("").unwrap()),
+            )?;
 
-    let cert = Identity::from_pkcs8(&pem, &key).unwrap();
-    let tls_acceptor = native_tls::TlsAcceptor::builder(cert).build().unwrap();
-    let tls_acceptor = tokio_native_tls::TlsAcceptor::from(tls_acceptor);
+            let cert = Identity::from_pkcs8(&pem, &key).unwrap();
+            let tls_acceptor =
+                native_tls::TlsAcceptor::builder(cert).build().unwrap();
+            let tls_acceptor =
+                tokio_native_tls::TlsAcceptor::from(tls_acceptor);
 
-    loop {
-        let settings = settings.clone();
+            loop {
+                let settings = settings.clone();
+                let (stream, _) = listener.clone().accept().await?;
 
-        let (stream, _) = listener.clone().accept().await?;
-
-        match settings.tls {
-            true => spawn_tls_server(tls_acceptor.clone(), stream, settings),
-            false => spawn_regular_server(stream, settings),
+                spawn_tls_server(tls_acceptor.clone(), stream, settings);
+            }
         }
+        false => loop {
+            let settings = settings.clone();
+            let (stream, _) = listener.clone().accept().await?;
+
+            spawn_regular_server(stream, settings);
+        },
     }
 }
 
@@ -97,18 +117,22 @@ async fn handle(
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
+    println!("try to connect to stream addr: {:?}", addr);
     let stream = TcpStream::connect(addr).await?;
 
+    println!("try to create new tokioio stream");
     let io = hyper_util::rt::TokioIo::new(stream);
 
     if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
         println!("upgrade header: {:#?}", upgrade);
     }
 
+    println!("create client and handshake");
     let (client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)
         .await?;
 
+    println!("spawn connection");
     tokio::task::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!(
@@ -126,9 +150,9 @@ async fn handle(
 
     let proxy_uri = proxy_request.uri().clone();
 
-    println!("sending request");
+    println!("send request");
     let res = send_request(client, proxy_request).await?;
-    println!("got response");
+    println!("get status");
     let status = res.status().as_u16();
 
     println!(
