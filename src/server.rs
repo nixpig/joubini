@@ -32,14 +32,12 @@ pub async fn start(
 
     match settings.tls {
         true => {
-            println!("read PEM");
             let pem = fs::read(
                 settings
                     .pem
                     .as_ref()
                     .unwrap_or(&PathBuf::from_str("").unwrap()),
             )?;
-            println!("read KEY");
             let key = fs::read(
                 settings
                     .key
@@ -117,22 +115,18 @@ async fn handle(
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
-    println!("try to connect to stream addr: {:?}", addr);
     let stream = TcpStream::connect(addr).await?;
 
-    println!("try to create new tokioio stream");
     let io = hyper_util::rt::TokioIo::new(stream);
 
     if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
         println!("upgrade header: {:#?}", upgrade);
     }
 
-    println!("create client and handshake");
     let (client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)
         .await?;
 
-    println!("spawn connection");
     tokio::task::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!(
@@ -150,9 +144,7 @@ async fn handle(
 
     let proxy_uri = proxy_request.uri().clone();
 
-    println!("send request");
     let res = send_request(client, proxy_request).await?;
-    println!("get status");
     let status = res.status().as_u16();
 
     println!(
