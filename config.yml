@@ -1,8 +1,8 @@
 port: 7878
 host: localhost
 tls: true
-pem: tests/ssl/localhost.crt
-key: tests/ssl/localhost.key
+pem: /tmp/localhost.crt
+key: /tmp/localhost.key
 proxies:
   - ":3000"
   - "one:3001/posts"

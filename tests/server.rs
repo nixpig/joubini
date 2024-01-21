@@ -585,8 +585,8 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
         proxies: vec![ProxyConfig::from_str(":3016").unwrap()],
         config: None,
         tls: true,
-        pem: Some(PathBuf::from_str("tests/ssl/localhost.crt").unwrap()),
-        key: Some(PathBuf::from_str("tests/ssl/localhost.key").unwrap()),
+        pem: Some(PathBuf::from_str("/tmp/localhost.crt").unwrap()),
+        key: Some(PathBuf::from_str("/tmp/localhost.key").unwrap()),
     };
 
     start_remote(3016, "/").await;

@@ -84,8 +84,8 @@ fn test_parse_settings_from_config_file_with_optional_fields(
             host: String::from("localhost"),
             local_port: 7878,
             tls: true,
-            pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-            key: Some(PathBuf::from("tests/ssl/localhost.key")),
+            pem: Some(PathBuf::from("/tmp/localhost.crt")),
+            key: Some(PathBuf::from("/tmp/localhost.key")),
             proxies: vec![
                 ProxyConfig {
                     local_path: String::from("/"),
@@ -176,8 +176,8 @@ fn test_parse_settings_from_cli() -> Result<(), Box<dyn Error>> {
         host: String::from("127.0.0.1"),
         local_port: 7878,
         tls: true,
-        pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-        key: Some(PathBuf::from("tests/ssl/localhost.key")),
+        pem: Some(PathBuf::from("/tmp/localhost.crt")),
+        key: Some(PathBuf::from("/tmp/localhost.key")),
         proxies: vec![
             String::from(":3000"),
             String::from(":3000/api"),
@@ -196,8 +196,8 @@ fn test_parse_settings_from_cli() -> Result<(), Box<dyn Error>> {
             host: String::from("127.0.0.1"),
             local_port: 7878,
             tls: true,
-            pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-            key: Some(PathBuf::from("tests/ssl/localhost.key")),
+            pem: Some(PathBuf::from("/tmp/localhost.crt")),
+            key: Some(PathBuf::from("/tmp/localhost.key")),
             proxies: vec![
                 ProxyConfig {
                     local_path: String::from("/"),
@@ -252,8 +252,8 @@ fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
         host: String::from("localhost_2"),
         local_port: 7879,
         tls: true,
-        pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-        key: Some(PathBuf::from("tests/ssl/localhost.key")),
+        pem: Some(PathBuf::from("/tmp/localhost.crt")),
+        key: Some(PathBuf::from("/tmp/localhost.key")),
         proxies: vec![ProxyConfig {
             local_path: String::from("/local_two"),
             remote_port: 3002,
@@ -270,8 +270,8 @@ fn test_merge_settings_structs() -> Result<(), Box<dyn Error>> {
             host: String::from("localhost_2"),
             local_port: 7879,
             tls: true,
-            pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-            key: Some(PathBuf::from("tests/ssl/localhost.key")),
+            pem: Some(PathBuf::from("/tmp/localhost.crt")),
+            key: Some(PathBuf::from("/tmp/localhost.key")),
             proxies: vec![
                 ProxyConfig {
                     local_path: String::from("/local_one"),
@@ -465,8 +465,8 @@ fn test_settings_with_config_file() -> Result<(), Box<dyn Error>> {
             host: String::from("localhost"),
             local_port: 7878,
             tls: true,
-            pem: Some(PathBuf::from("tests/ssl/localhost.crt")),
-            key: Some(PathBuf::from("tests/ssl/localhost.key")),
+            pem: Some(PathBuf::from("/tmp/localhost.crt")),
+            key: Some(PathBuf::from("/tmp/localhost.key")),
             proxies: vec![
                 ProxyConfig {
                     local_path: String::from("/"),

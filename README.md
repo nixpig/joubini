@@ -69,8 +69,8 @@ Proxies defined in the config file follow the same pattern as via CLI, i.e.
 port: 7878
 host: localhost
 tls: true
-pem: tests/ssl/localhost.crt
-key: tests/ssl/localhost.key
+pem: /tmp/localhost.crt
+key: /tmp/localhost.key
 proxies:
   - :3000 # http://127.0.0.1 -> http://127.0.0.1:3000
   - api:3001/api # http://127.0.0.1/api -> http://127.0.0.1:3001/api
