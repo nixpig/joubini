@@ -48,6 +48,11 @@ jobs:
 
       - name: Test
         run: |
+          cargo test \
+            --nocapture
+
+      - name: Coverage
+        run: |
           cargo install cargo-tarpaulin \
           && cargo tarpaulin \
             --workspace \

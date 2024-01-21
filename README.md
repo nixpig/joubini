@@ -18,11 +18,11 @@ At this time, I wouldn't recommend using this for anything more than playing aro
 - [x] Support clients using HTTP/1.1
 - [x] Support clients using HTTP/2
 - [x] Support TLS/SSL (HTTPS)
-- [x] `ip:port` of client added to the `x-forwarded-for` header
-- [x] Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default
+- [x] Add client `ip:port` to `x-forwarded-for` header
+- [x] Remove hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) by default
 - [ ] Support web sockets
 - [ ] Support connection pooling
-- [ ] Support on-the-fly creating of SSL certificates.
+- [ ] Support on-the-fly creating of SSL certificates
 
 ## Usage
 

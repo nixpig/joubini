@@ -8,11 +8,11 @@ use reqwest::StatusCode;
 use serial_test::serial;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{env, fs};
 
 static HOP_HEADERS: [HeaderName; 7] = [
     HeaderName::from_static("keep-alive"),
@@ -591,6 +591,9 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
 
     start_remote(3016, "/").await;
     start_joubini(settings).await;
+
+    let cwd = env::current_dir()?;
+    println!("current working directory: {}", cwd.to_str().unwrap());
 
     let pem = fs::read("tests/ssl/localhost.crt").unwrap();
     let key = fs::read("tests/ssl/localhost.key").unwrap();
