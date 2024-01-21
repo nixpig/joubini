@@ -8,11 +8,11 @@ use reqwest::StatusCode;
 use serial_test::serial;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{env, fs};
 
 static HOP_HEADERS: [HeaderName; 7] = [
     HeaderName::from_static("keep-alive"),
@@ -594,7 +594,7 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
 
     let pem = fs::read("/tmp/localhost.crt").unwrap();
     let key = fs::read("/tmp/localhost.key").unwrap();
-    let root = fs::read("/tmp/myCA.pem").unwrap();
+    let root = fs::read("/tmp/localCA.pem").unwrap();
 
     let cert = reqwest::Identity::from_pkcs8_pem(&pem, &key)?;
     let ca = reqwest::Certificate::from_pem(&root)?;
