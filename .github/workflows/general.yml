@@ -41,10 +41,10 @@ jobs:
 
       - name: Certs
         run: |
-          sudo apt-get install -y ca-certificates
-          pwd
-          sudo cp tests/ssl/localhost.crt /usr/local/share/ca-certificates
-          sudo update-ca-certificates
+          bash -c $(pwd)/scripts/ca.sh \
+            && sudo mkdir -p /usr/local/share/ca-certificates/extra \
+            && sudo cp tests/ssl/localhost.crt /usr/local/share/ca-certificates/extra/ \
+            && sudo update-ca-certificates
 
       - name: Test
         run: |
