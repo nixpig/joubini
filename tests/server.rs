@@ -595,6 +595,21 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
     let cwd = env::current_dir()?;
     println!("current working directory: {}", cwd.to_str().unwrap());
 
+    let contents = fs::read_dir(cwd.clone()).unwrap();
+    for content in contents {
+        println!("{:#?}", content.unwrap());
+    }
+
+    let tests = fs::read_dir(format!("{:#?}/tests", cwd.clone())).unwrap();
+    for test in tests {
+        println!("{:?}", test.unwrap());
+    }
+
+    let ssl = fs::read_dir(format!("{:#?}/tests/ssl", cwd.clone())).unwrap();
+    for s in ssl {
+        println!("{:?}", s.unwrap());
+    }
+
     let pem = fs::read("tests/ssl/localhost.crt").unwrap();
     let key = fs::read("tests/ssl/localhost.key").unwrap();
     let root = fs::read("tests/ssl/myCA.pem").unwrap();
