@@ -48,8 +48,7 @@ jobs:
 
       - name: Test
         run: |
-          cargo test \
-            --nocapture
+          cargo test -- --nocapture
 
       - name: Coverage
         run: |
