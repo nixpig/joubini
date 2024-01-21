@@ -1,36 +1,57 @@
 #!/usr/bin/env bash
-#
-# Credit: https://stackoverflow.com/questions/7580508/getting-chrome-to-accept-self-signed-localhost-certificate/60516812#60516812
 
-######################
-# Become a Certificate Authority
-######################
+OUT=tests/ssl
+CANAME=localCA
+HOSTNAME=localhost
+PASS=1234
 
-# Generate private key
-openssl genrsa -des3 -out myCA.key 2048
-# Generate root certificate
-openssl req -x509 -new -nodes -key myCA.key -sha256 -days 825 -out myCA.pem
+mkdir -p $OUT
 
-######################
-# Create CA-signed certs
-######################
+openssl genrsa -des3 -out "$OUT/$CANAME.key" -passout "pass:$PASS" 2048  \
+	&& echo "✅ CA private key: '$OUT/$CANAME.key'"
 
-NAME=localhost
-# Generate a private key
-openssl genrsa -out $NAME.key 2048
-# Create a certificate-signing request
-openssl req -new -key $NAME.key -out $NAME.csr
+openssl req \
+	-x509 \
+	-new \
+	-nodes \
+	-key "$OUT/$CANAME.key" \
+	-passin "pass:$PASS" \
+	-sha256 \
+	-days 825 \
+	-out "$OUT/$CANAME.pem" \
+	-subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com" \
+		&& echo "✅ CA root certificate: '$OUT/$CANAME.pem'"
+
+openssl genrsa -out "$OUT/$HOSTNAME.key" 2048 \
+	&& echo "✅ Private key: '$OUT/$HOSTNAME.key'"
+
+openssl req \
+	-new \
+	-key "$OUT/$HOSTNAME.key" \
+	-out "$OUT/$HOSTNAME.csr" \
+	-subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com" \
+		&& echo "✅ Certificate signing request: '$OUT/$HOSTNAME.csr'"
+
 # Create a config file for the extensions
->$NAME.ext cat <<-EOF
+>"$OUT/$HOSTNAME.ext" cat <<-EOF
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
 subjectAltName = @alt_names
 [alt_names]
-DNS.1 = $NAME # Be sure to include the domain name here because Common Name is not so commonly honoured by itself
-# DNS.2 = bar.$NAME # Optionally, add additional domains (I've added a subdomain here)
-# IP.1 = 192.168.0.13 # Optionally, add an IP address (if the connection which you have planned requires it)
+DNS.1 = $HOSTNAME
+IP.1 = 127.0.0.1
 EOF
-# Create the signed certificate
-openssl x509 -req -in $NAME.csr -CA myCA.pem -CAkey myCA.key -CAcreateserial \
--out $NAME.crt -days 825 -sha256 -extfile $NAME.ext
+
+openssl x509 \
+	-req \
+	-in "$OUT/$HOSTNAME.csr" \
+	-CA "$OUT/$CANAME.pem" \
+	-CAkey "$OUT/$CANAME.key" \
+	-passin "pass:$PASS" \
+	-CAcreateserial \
+	-out "$OUT/$HOSTNAME.crt" \
+	-days 825 \
+	-sha256 \
+	-extfile "$OUT/$HOSTNAME.ext" \
+		&& echo "✅ Signed certificate: '$OUT/$HOSTNAME.crt'"
