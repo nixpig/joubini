@@ -43,7 +43,7 @@ jobs:
         run: |
           bash -c $(pwd)/scripts/ca.sh \
             && sudo mkdir -p /usr/local/share/ca-certificates/extra \
-            && sudo cp tests/ssl/localhost.crt /usr/local/share/ca-certificates/extra/ \
+            && sudo cp /tmp/localhost.crt /usr/local/share/ca-certificates/extra/ \
             && sudo update-ca-certificates
 
       - name: Test

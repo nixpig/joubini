@@ -592,27 +592,9 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
     start_remote(3016, "/").await;
     start_joubini(settings).await;
 
-    let cwd = env::current_dir()?;
-    println!("current working directory: {}", cwd.to_str().unwrap());
-
-    let contents = fs::read_dir(cwd.clone()).unwrap();
-    for content in contents {
-        println!("{:#?}", content.unwrap());
-    }
-
-    let tests = fs::read_dir(format!("{:#?}/tests", cwd.clone())).unwrap();
-    for test in tests {
-        println!("{:?}", test.unwrap());
-    }
-
-    let ssl = fs::read_dir(format!("{:#?}/tests/ssl", cwd.clone())).unwrap();
-    for s in ssl {
-        println!("{:?}", s.unwrap());
-    }
-
-    let pem = fs::read("tests/ssl/localhost.crt").unwrap();
-    let key = fs::read("tests/ssl/localhost.key").unwrap();
-    let root = fs::read("tests/ssl/myCA.pem").unwrap();
+    let pem = fs::read("/tmp/localhost.crt").unwrap();
+    let key = fs::read("/tmp/localhost.key").unwrap();
+    let root = fs::read("/tmp/myCA.pem").unwrap();
 
     let cert = reqwest::Identity::from_pkcs8_pem(&pem, &key)?;
     let ca = reqwest::Certificate::from_pem(&root)?;
