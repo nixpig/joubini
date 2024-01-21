@@ -5,25 +5,24 @@
 
 A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
 
+![Screenshot of Joubini running as reverse proxy](screenshot.png)
+
 ## ⚠️ WORK IN PROGRESS
 
 This is a **work in progress**. It's not stable, it's not secure, and performance isn't great.
 
 At this time, I wouldn't recommend using this for anything more than playing around. If you're looking for something production-ready, there are plenty of [good alternatives](#Alternatives) out there.
 
-### todo!
-
-- [ ] Add support for web sockets.
-- [ ] Use a connection pool instead of recreating for every request?
-
 ## Features
 
-![Screenshot of Joubini running as reverse proxy](screenshot.png)
-
-### Notes
-
-- The `ip:port` of the client is added to the `x-forwarded-for` header.
-- Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default.
+- [x] Support clients using HTTP/1.1
+- [x] Support clients using HTTP/2
+- [x] Support TLS/SSL (HTTPS)
+- [x] `ip:port` of client added to the `x-forwarded-for` header
+- [x] Hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) are removed by default
+- [ ] Support web sockets
+- [ ] Support connection pooling
+- [ ] Support on-the-fly creating of SSL certificates.
 
 ## Usage
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-OUT=tests/ssl
+OUT=$(pwd)/tests/ssl
 CANAME=localCA
 HOSTNAME=localhost
 PASS=1234
