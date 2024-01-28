@@ -10,7 +10,7 @@ use hyper::{
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use lazy_static::lazy_static;
 use native_tls::Identity;
-use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fs, path::PathBuf, str::FromStr, sync::Arc};
 use tokio_native_tls::TlsAcceptor;
 
 lazy_static! {
@@ -21,7 +21,20 @@ lazy_static! {
 
 use http_body_util::{combinators::BoxBody, BodyExt};
 use hyper::{body::Incoming, service::service_fn, Request, Response};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::Mutex,
+};
+
+struct ProxyConnection {
+    client: Box<SendRequest<Incoming>>,
+    connection: Box<
+        hyper::client::conn::http1::Connection<
+            hyper_util::rt::TokioIo<TcpStream>,
+            hyper::body::Incoming,
+        >,
+    >,
+}
 
 pub async fn start(
     listener: Arc<TcpListener>,
@@ -29,6 +42,9 @@ pub async fn start(
 ) -> Result<(), Error> {
     println!("Listening on: {}", listener.local_addr()?);
     println!("{}", settings);
+
+    let pool =
+        Arc::from(Mutex::from(HashMap::<String, ProxyConnection>::new()));
 
     match settings.tls {
         true => {
@@ -55,14 +71,19 @@ pub async fn start(
                 let settings = settings.clone();
                 let (stream, _) = listener.clone().accept().await?;
 
-                spawn_tls_server(tls_acceptor.clone(), stream, settings);
+                spawn_tls_server(
+                    tls_acceptor.clone(),
+                    stream,
+                    settings,
+                    pool.clone(),
+                );
             }
         }
         false => loop {
             let settings = settings.clone();
             let (stream, _) = listener.clone().accept().await?;
 
-            spawn_regular_server(stream, settings);
+            spawn_regular_server(stream, settings, pool.clone());
         },
     }
 }
@@ -71,6 +92,7 @@ fn spawn_tls_server(
     tls_acceptor: TlsAcceptor,
     stream: TcpStream,
     settings: Arc<Settings>,
+    pool: Arc<Mutex<HashMap<String, ProxyConnection>>>,
 ) {
     tokio::task::spawn(async move {
         let tls_stream =
@@ -82,7 +104,7 @@ fn spawn_tls_server(
             hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
                 .serve_connection(
                     io,
-                    service_fn(move |req| handle(req, settings.clone())),
+                    service_fn(move |req| handle(req, settings.clone(), pool)),
                 )
                 .await
         {
@@ -91,14 +113,18 @@ fn spawn_tls_server(
     });
 }
 
-fn spawn_regular_server(stream: TcpStream, settings: Arc<Settings>) {
+fn spawn_regular_server(
+    stream: TcpStream,
+    settings: Arc<Settings>,
+    pool: Arc<Mutex<HashMap<String, ProxyConnection>>>,
+) {
     tokio::task::spawn(async move {
         let io = TokioIo::new(stream);
 
         if let Err(e) = server::conn::http1::Builder::new()
             .serve_connection(
                 io,
-                service_fn(move |req| handle(req, settings.clone())),
+                service_fn(move |req| handle(req, settings.clone(), pool)),
             )
             .await
         {
@@ -110,20 +136,43 @@ fn spawn_regular_server(stream: TcpStream, settings: Arc<Settings>) {
 async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
+    pool: Arc<Mutex<HashMap<String, ProxyConnection>>>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     let proxy = get_proxy(req.uri().path().to_string(), &settings.proxies);
 
-    let addr = build_addr(&settings.host, proxy.remote_port);
+    let (client, connection) = match pool.into_inner().get(&String::from("1")) {
+        Some(c) => {
+            println!("using existing connection");
+            (*c.client.inner(), *c.connection)
+        }
+        None => {
+            println!("creating new connection for: {:?}", proxy);
 
-    let stream = TcpStream::connect(addr).await?;
+            let addr = build_addr(&settings.host, proxy.remote_port);
 
-    let io = hyper_util::rt::TokioIo::new(stream);
+            let stream = TcpStream::connect(addr).await?;
 
-    let (client, connection) = hyper::client::conn::http1::Builder::new()
-        .handshake(io)
-        .await?;
+            let io = hyper_util::rt::TokioIo::new(stream);
+
+            let (client, connection) =
+                hyper::client::conn::http1::Builder::new()
+                    .handshake(io)
+                    .await?;
+
+            let connection = ProxyConnection {
+                client: Box::new(client),
+                connection: Box::new(connection),
+            };
+            pool.lock().await.insert(String::from("1"), connection);
+
+            let fc = pool.lock().await.get(&String::from("1")).unwrap();
+
+            (*fc.client, *fc.connection)
+        }
+    };
 
     tokio::task::spawn(async move {
+        tokio::pin!(connection);
         if let Err(e) = connection.await {
             eprintln!(
                 "\x1b[31mERR\x1b[0m Unable to establish connection: {:?}",
