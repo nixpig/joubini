@@ -33,3 +33,4 @@ db.json
 *.ext
 *.csr
 
+node_modules/

@@ -1,0 +1,7 @@
+host: localhost
+# tls: true
+# pem: /tmp/localhost.crt
+# key: /tmp/localhost.key
+proxies:
+  - ":8080"
+  - "ws:9001"

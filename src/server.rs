@@ -119,10 +119,6 @@ async fn handle(
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
-    if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
-        println!("upgrade header: {:#?}", upgrade);
-    }
-
     let (client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)
         .await?;
@@ -180,6 +176,10 @@ pub fn build_request(
     strip_hop_by_hop_headers(req.headers_mut());
     add_x_forwarded_for_header(req.headers_mut(), &local_addr)?;
     add_host_header(req.headers_mut(), &remote_addr)?;
+
+    if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
+        println!("upgrade header: {:#?}", upgrade);
+    }
 
     let mapped_uri = map_proxy_uri(req.uri(), proxy)?;
     *req.uri_mut() = mapped_uri;

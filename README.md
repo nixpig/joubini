@@ -15,14 +15,15 @@ At this time, I wouldn't recommend using this for anything more than playing aro
 
 ## Features
 
-- [x] Support clients using HTTP/1.1
-- [x] Support clients using HTTP/2
-- [x] Support TLS/SSL (HTTPS)
-- [x] Add client `ip:port` to `x-forwarded-for` header
-- [x] Remove hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) by default
-- [ ] Support web sockets
-- [ ] Support connection pooling
-- [ ] Support on-the-fly creating of SSL certificates
+- [x] Support for clients using HTTP/1.1
+- [x] Support for clients using HTTP/2
+- [x] Support for TLS/SSL (HTTPS)
+- [x] Adds client `ip:port` to `x-forwarded-for` header
+- [x] Removes hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) by default
+- [ ] Support for connection pooling
+- [ ] Support for web sockets
+- [ ] Optionally don't remove hop-by-hop headers
+- [ ] Support for on-the-fly creation of SSL certificates
 
 ## Usage
 
@@ -138,9 +139,9 @@ joubini \
 ### Using TLS (SSL) on `localhost`
 
 1. Create a new CA and generate certificates using the included script: `bash -c scripts/ca.sh`
-1. Specify the `localhost.crt` and `localhost.key` when configuring `joubini`
-1. Trust certificate: `cp localhost.crt /etc/ca-certificates/trust-source/anchors/ && update-ca-trust extract`
-1. In Chrome, add the `myCA.pem` under `chrome://settings/certificates` -> Authorities
+1. Specify the `/tmp/localhost.crt` and `/tmp/localhost.key` when configuring `joubini`
+1. Trust certificate: `cp /tmp/localhost.crt /etc/ca-certificates/trust-source/anchors/ && update-ca-trust extract`
+1. In Chrome, add the `/tmp/myCA.pem` under `chrome://settings/certificates` -> Authorities
 
 ## Motivation
 

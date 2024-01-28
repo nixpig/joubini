@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>WebSocket Echo Server</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+  <h1>WebSocket Echo Server</h1>
+  <div>
+    <h2>Send messages</h2>
+    <form name="echo" id="echo">
+      <label for="message">Message:</label><br>
+      <input type="text" name="message" id="message"><br>
+      <button id="send-message">Send</button>
+    </form>
+  </div>
+  <div>
+    <h2>Response</h2>
+    <ul id="responses">
+      &nbsp;
+    </ul>
+  </div>
+  <script src="client.js"></script>
+</body>
+
+</html>

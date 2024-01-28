@@ -1,0 +1,14 @@
+{
+  "name": "node-websocket",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start:server": "node server.js",
+    "start:client": "http-server . -p 8080"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1",
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.41.0"
+  }
+}
