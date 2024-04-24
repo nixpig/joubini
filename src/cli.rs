@@ -57,7 +57,7 @@ pub struct Cli {
 
     #[clap(
         long = "key",
-        help = "Path to SSL certificate key as `.key`. Required if `--tls` flag is enabled."
+        help = "Path to TLS/SSL certificate key as `.key`. Required if `--tls` flag is enabled."
     )]
     pub key: Option<PathBuf>,
 }

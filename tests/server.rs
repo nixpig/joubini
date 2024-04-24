@@ -115,6 +115,30 @@ async fn test_fail_when_no_remote_server() -> Result<(), Box<dyn Error>> {
 
 #[serial]
 #[tokio::test]
+async fn test_fail_when_no_proxy_specified() -> Result<(), Box<dyn Error>> {
+    let settings = Settings {
+        config: None,
+        host: String::from("localhost"),
+        local_port: 7878,
+        tls: false,
+        pem: None,
+        key: None,
+        proxies: vec![],
+    };
+
+    start_joubini(settings).await;
+
+    let client = reqwest::Client::new();
+
+    let response = client.get("http://localhost:7878").send().await;
+
+    assert!(response.is_err());
+
+    Ok(())
+}
+
+#[serial]
+#[tokio::test]
 async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         config: None,
@@ -579,6 +603,7 @@ async fn test_response_codes() -> Result<(), Box<dyn Error>> {
 #[serial]
 #[tokio::test]
 async fn test_tls_server() -> Result<(), Box<dyn Error>> {
+    // TODO: generate TLS cert on the fly
     let settings = Settings {
         host: String::from("localhost"),
         local_port: 7878,

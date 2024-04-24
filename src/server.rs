@@ -5,13 +5,12 @@ use crate::{
 use hyper::{
     client::conn::http1::SendRequest,
     header::{HeaderName, HeaderValue},
-    server, HeaderMap, Uri,
+    HeaderMap, Uri,
 };
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use lazy_static::lazy_static;
 use native_tls::Identity;
 use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
-use tokio_native_tls::TlsAcceptor;
 
 lazy_static! {
     static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
@@ -46,8 +45,10 @@ pub async fn start(
             )?;
 
             let cert = Identity::from_pkcs8(&pem, &key).unwrap();
+
             let tls_acceptor =
                 native_tls::TlsAcceptor::builder(cert).build().unwrap();
+
             let tls_acceptor =
                 tokio_native_tls::TlsAcceptor::from(tls_acceptor);
 
@@ -55,52 +56,39 @@ pub async fn start(
                 let settings = settings.clone();
                 let (stream, _) = listener.clone().accept().await?;
 
-                spawn_tls_server(tls_acceptor.clone(), stream, settings);
+                // spawn_tls_server(tls_acceptor.clone(), stream, settings);
+                let tls_stream =
+                    tls_acceptor.accept(stream).await.expect("accept error");
+                let io = hyper_util::rt::TokioIo::new(tls_stream);
+                spawn_server(io, settings)
             }
         }
         false => loop {
             let settings = settings.clone();
             let (stream, _) = listener.clone().accept().await?;
+            let io = hyper_util::rt::TokioIo::new(stream);
 
-            spawn_regular_server(stream, settings);
+            spawn_server(io, settings);
         },
     }
 }
 
-fn spawn_tls_server(
-    tls_acceptor: TlsAcceptor,
-    stream: TcpStream,
+fn spawn_server(
+    io_stream: impl hyper::rt::Read
+        + hyper::rt::Write
+        + std::marker::Unpin
+        + std::marker::Send
+        + 'static,
     settings: Arc<Settings>,
 ) {
     tokio::task::spawn(async move {
-        let tls_stream =
-            tls_acceptor.accept(stream).await.expect("accept error");
-
-        let io = hyper_util::rt::TokioIo::new(tls_stream);
-
         if let Err(e) =
             hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
                 .serve_connection(
-                    io,
+                    io_stream,
                     service_fn(move |req| handle(req, settings.clone())),
                 )
                 .await
-        {
-            eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
-        }
-    });
-}
-
-fn spawn_regular_server(stream: TcpStream, settings: Arc<Settings>) {
-    tokio::task::spawn(async move {
-        let io = TokioIo::new(stream);
-
-        if let Err(e) = server::conn::http1::Builder::new()
-            .serve_connection(
-                io,
-                service_fn(move |req| handle(req, settings.clone())),
-            )
-            .await
         {
             eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
         }

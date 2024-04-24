@@ -22,7 +22,7 @@ At this time, I wouldn't recommend using this for anything more than playing aro
 - [x] Removes hop-by-hop headers (as defined in [RFC2616](https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1)) by default
 - [ ] Support for connection pooling
 - [ ] Support for web sockets
-- [ ] Optionally don't remove hop-by-hop headers
+- [ ] Optionally don't remove hop-by-hop headers?
 - [ ] Support for on-the-fly creation of SSL certificates
 
 ## Usage
