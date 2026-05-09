@@ -4,7 +4,6 @@ use hyper::Uri;
 use joubini::server::start;
 use joubini::settings::{ProxyConfig, Settings};
 use reqwest::StatusCode;
-use reqwest::header::HeaderName;
 use serial_test::serial;
 use std::collections::HashMap;
 use std::error::Error;
@@ -14,14 +13,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-static HOP_HEADERS: [HeaderName; 7] = [
-    HeaderName::from_static("keep-alive"),
-    header::PROXY_AUTHENTICATE,
-    header::PROXY_AUTHORIZATION,
-    header::TE,
-    header::TRAILER,
-    header::TRANSFER_ENCODING,
-    header::UPGRADE,
+static HOP_HEADERS: [hyper::header::HeaderName; 7] = [
+    hyper::header::HeaderName::from_static("keep-alive"),
+    hyper::header::PROXY_AUTHENTICATE,
+    hyper::header::PROXY_AUTHORIZATION,
+    hyper::header::TE,
+    hyper::header::TRAILER,
+    hyper::header::TRANSFER_ENCODING,
+    hyper::header::UPGRADE,
 ];
 
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -70,14 +69,14 @@ async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
 
     let res = client
         .get("http://localhost:7878/headers")
-        .header(header::HOST, "http://localhost")
+        .header(hyper::header::HOST, "http://localhost")
         .header("keep-alive", "true")
-        .header(header::PROXY_AUTHENTICATE, "")
-        .header(header::PROXY_AUTHORIZATION, "")
-        .header(header::TE, "")
-        .header(header::TRAILER, "")
-        .header(header::TRANSFER_ENCODING, "")
-        .header(header::UPGRADE, "")
+        .header(hyper::header::PROXY_AUTHENTICATE, "")
+        .header(hyper::header::PROXY_AUTHORIZATION, "")
+        .header(hyper::header::TE, "")
+        .header(hyper::header::TRAILER, "")
+        .header(hyper::header::TRANSFER_ENCODING, "")
+        .header(hyper::header::UPGRADE, "")
         .header("x-custom-header", "custom_header_value")
         .send()
         .await?;
@@ -558,7 +557,7 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
 
     let res = client
         .get("http://localhost:7878/append-forwarded")
-        .header(header::X_FORWARDED_FOR, "first:2323")
+        .header("x-forwarded-for", "first:2323")
         .send()
         .await
         .unwrap();
@@ -728,7 +727,7 @@ async fn get_ok() -> HttpResponse {
 async fn headers_ok(req: HttpRequest) -> HttpResponse {
     let headers: &HeaderMap = req.headers();
 
-    let hop_headers: Vec<&HeaderName> = HOP_HEADERS
+    let hop_headers: Vec<&hyper::header::HeaderName> = HOP_HEADERS
         .iter()
         .filter(|h| headers.get(h.to_string()).is_some())
         .collect();
