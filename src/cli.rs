@@ -7,23 +7,16 @@ use std::path::PathBuf;
     about = "A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets."
 )]
 pub struct Cli {
-    #[clap(
-        short = 'H',
-        long = "host",
-        name = "host",
-        help = "Hostname or IP",
-        default_value = "127.0.0.1"
-    )]
-    pub host: String,
+    #[clap(short = 'H', long = "host", name = "host", help = "Hostname or IP")]
+    pub host: Option<String>,
 
     #[clap(
         short = 'P',
         long = "port",
         name = "local_port",
-        help = "Local port for reverse proxy server to listen on",
-        default_value = "80"
+        help = "Local port for reverse proxy server to listen on"
     )]
-    pub local_port: u16,
+    pub local_port: Option<u16>,
 
     #[clap(
         short = 'p',

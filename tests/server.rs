@@ -1,10 +1,10 @@
 use actix_web::http::header::{self, HeaderMap};
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, web};
 use hyper::Uri;
 use joubini::server::start;
 use joubini::settings::{ProxyConfig, Settings};
-use reqwest::header::HeaderName;
 use reqwest::StatusCode;
+use reqwest::header::HeaderName;
 use serial_test::serial;
 use std::collections::HashMap;
 use std::error::Error;
@@ -130,9 +130,9 @@ async fn test_fail_when_no_proxy_specified() -> Result<(), Box<dyn Error>> {
 
     let client = reqwest::Client::new();
 
-    let response = client.get("http://localhost:7878").send().await;
+    let response = client.get("http://localhost:7878").send().await?;
 
-    assert!(response.is_err());
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     Ok(())
 }
@@ -265,8 +265,10 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str("foo:3001")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str("foo:3001")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_remote(3001, "/").await;
@@ -300,8 +302,10 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str("bar:3002/bar")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str("bar:3002/bar")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_remote(3002, "/bar").await;
@@ -335,8 +339,10 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str("baz:3003/qux")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str("baz:3003/qux")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_remote(3003, "/qux").await;
@@ -370,8 +376,10 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str("foo:3004/bar/baz/qux")
-            .expect("Unable to parse proxy config from string")],
+        proxies: vec![
+            ProxyConfig::from_str("foo:3004/bar/baz/qux")
+                .expect("Unable to parse proxy config from string"),
+        ],
     };
 
     start_remote(3004, "/bar/baz/qux").await;
@@ -405,8 +413,10 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str("foo/bar/baz:3005/qux")
-            .expect("Unable to parse proxy settings from provided string")],
+        proxies: vec![
+            ProxyConfig::from_str("foo/bar/baz:3005/qux")
+                .expect("Unable to parse proxy settings from provided string"),
+        ],
     };
 
     start_remote(3005, "/qux").await;
@@ -507,8 +517,10 @@ async fn test_add_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str(":3012")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str(":3012")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_joubini(settings).await;
@@ -533,8 +545,10 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str(":3013")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str(":3013")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_joubini(settings).await;
@@ -564,8 +578,10 @@ async fn test_response_codes() -> Result<(), Box<dyn Error>> {
         tls: false,
         pem: None,
         key: None,
-        proxies: vec![ProxyConfig::from_str(":3014")
-            .expect("Unable to parse proxy string")],
+        proxies: vec![
+            ProxyConfig::from_str(":3014")
+                .expect("Unable to parse proxy string"),
+        ],
     };
 
     start_joubini(settings).await;
@@ -664,11 +680,9 @@ async fn start_joubini(settings: Settings) {
     let settings = Arc::new(settings);
 
     tokio::spawn(async move {
-        loop {
-            start(listener.clone(), settings.clone())
-                .await
-                .expect("Unable to start server");
-        }
+        start(listener.clone(), settings.clone())
+            .await
+            .expect("Unable to start server");
     });
 }
 

@@ -50,29 +50,6 @@ impl Display for Settings {
     }
 }
 
-impl Settings {
-    pub fn new() -> Settings {
-        Settings::default()
-    }
-
-    pub fn merge(&mut self, other: &mut Settings) -> Settings {
-        let mut proxies: Vec<ProxyConfig> = vec![];
-
-        proxies.append(&mut self.proxies);
-        proxies.append(&mut other.proxies);
-
-        Settings {
-            host: other.host.clone(),
-            local_port: other.local_port,
-            proxies,
-            config: other.config.clone(),
-            tls: other.tls,
-            pem: other.pem.clone(),
-            key: other.key.clone(),
-        }
-    }
-}
-
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct ProxyConfig {
     pub local_path: String,
@@ -103,28 +80,6 @@ impl FromStr for ProxyConfig {
         } else {
             Err(Error::ParseError(ParseError::ProxyDefinition))
         }
-    }
-}
-
-impl TryFrom<Cli> for Settings {
-    type Error = Error;
-
-    fn try_from(value: Cli) -> Result<Self, Self::Error> {
-        let proxies = value
-            .proxies
-            .iter()
-            .map(|p| ProxyConfig::from_str(p))
-            .collect::<Result<Vec<ProxyConfig>, Error>>()?;
-
-        Ok(Settings {
-            host: value.host,
-            local_port: value.local_port,
-            proxies,
-            config: value.config,
-            tls: value.tls,
-            pem: value.pem,
-            key: value.key,
-        })
     }
 }
 
@@ -164,7 +119,7 @@ impl TryFrom<PathBuf> for Settings {
             .map(|p| ProxyConfig::from_str(p))
             .collect::<Result<Vec<ProxyConfig>, Error>>()?;
 
-        let tls = config_yaml.tls.is_some();
+        let tls = config_yaml.tls.unwrap_or(false);
 
         Ok(Settings {
             host: config_yaml.host,
@@ -179,15 +134,30 @@ impl TryFrom<PathBuf> for Settings {
 }
 
 pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
-    let mut cli_settings: Settings = Cli::parse_from(cli_args).try_into()?;
+    let cli = Cli::parse_from(cli_args);
 
-    if let Some(config_file) = &cli_settings.config {
-        let mut file_settings = Settings::try_from(PathBuf::from(config_file))?;
+    let mut file = cli
+        .config
+        .as_ref()
+        .map(|p| Settings::try_from(PathBuf::from(p)))
+        .transpose()?
+        .unwrap_or_default();
 
-        Ok(Settings::new()
-            .merge(&mut cli_settings)
-            .merge(&mut file_settings))
-    } else {
-        Ok(cli_settings)
-    }
+    let mut cli_proxies = cli
+        .proxies
+        .iter()
+        .map(|p| ProxyConfig::from_str(p))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    file.proxies.append(&mut cli_proxies);
+
+    Ok(Settings {
+        host: cli.host.unwrap_or(file.host),
+        local_port: cli.local_port.unwrap_or(file.local_port),
+        proxies: file.proxies,
+        config: cli.config.or(file.config),
+        tls: cli.tls || file.tls,
+        pem: cli.pem.or(file.pem),
+        key: cli.key.or(file.key),
+    })
 }

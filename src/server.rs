@@ -1,25 +1,25 @@
 use crate::{
     error::Error,
+    error::ParseError,
     settings::{ProxyConfig, Settings},
 };
 use hyper::{
-    client::conn::http1::SendRequest,
-    header::{HeaderName, HeaderValue},
     HeaderMap, Uri,
+    header::{HeaderName, HeaderValue},
 };
-use hyper_util::rt::{TokioExecutor, TokioIo};
-use lazy_static::lazy_static;
+use hyper_util::rt::TokioExecutor;
 use native_tls::Identity;
-use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
+use std::sync::LazyLock;
+use std::{fs, sync::Arc};
 
-lazy_static! {
-    static ref HOST_HEADER_NAME: HeaderName = HeaderName::from_static("host");
-    static ref X_FORWARDED_FOR_HEADER_NAME: HeaderName =
-        HeaderName::from_static("x-forwarded-for");
-}
+static HOST_HEADER_NAME: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("host"));
 
-use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{body::Incoming, service::service_fn, Request, Response};
+static X_FORWARDED_FOR_HEADER_NAME: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("x-forwarded-for"));
+
+use http_body_util::{BodyExt, combinators::BoxBody};
+use hyper::{Request, Response, body::Incoming, service::service_fn};
 use tokio::net::{TcpListener, TcpStream};
 
 pub async fn start(
@@ -31,41 +31,47 @@ pub async fn start(
 
     match settings.tls {
         true => {
-            let pem = fs::read(
-                settings
-                    .pem
-                    .as_ref()
-                    .unwrap_or(&PathBuf::from_str("").unwrap()),
-            )?;
-            let key = fs::read(
-                settings
-                    .key
-                    .as_ref()
-                    .unwrap_or(&PathBuf::from_str("").unwrap()),
-            )?;
+            let pem = fs::read(settings.pem.as_ref().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "no pem provided",
+                )
+            })?)?;
 
-            let cert = Identity::from_pkcs8(&pem, &key).unwrap();
+            let key = fs::read(settings.key.as_ref().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "no key provided",
+                )
+            })?)?;
+
+            let cert = Identity::from_pkcs8(&pem, &key)?;
 
             let tls_acceptor =
-                native_tls::TlsAcceptor::builder(cert).build().unwrap();
+                native_tls::TlsAcceptor::builder(cert).build()?;
 
             let tls_acceptor =
                 tokio_native_tls::TlsAcceptor::from(tls_acceptor);
 
             loop {
                 let settings = settings.clone();
-                let (stream, _) = listener.clone().accept().await?;
+                let (stream, _) = listener.accept().await?;
 
-                // spawn_tls_server(tls_acceptor.clone(), stream, settings);
-                let tls_stream =
-                    tls_acceptor.accept(stream).await.expect("accept error");
-                let io = hyper_util::rt::TokioIo::new(tls_stream);
-                spawn_server(io, settings)
+                match tls_acceptor.accept(stream).await {
+                    Ok(tls_stream) => {
+                        let io = hyper_util::rt::TokioIo::new(tls_stream);
+                        spawn_server(io, settings)
+                    }
+                    Err(e) => eprintln!(
+                        "\x1b[31mERR\x1b[0m TLS handshake failed: {}",
+                        e
+                    ),
+                }
             }
         }
         false => loop {
             let settings = settings.clone();
-            let (stream, _) = listener.clone().accept().await?;
+            let (stream, _) = listener.accept().await?;
             let io = hyper_util::rt::TokioIo::new(stream);
 
             spawn_server(io, settings);
@@ -75,10 +81,10 @@ pub async fn start(
 
 fn spawn_server(
     io_stream: impl hyper::rt::Read
-        + hyper::rt::Write
-        + std::marker::Unpin
-        + std::marker::Send
-        + 'static,
+    + hyper::rt::Write
+    + std::marker::Unpin
+    + std::marker::Send
+    + 'static,
     settings: Arc<Settings>,
 ) {
     tokio::task::spawn(async move {
@@ -99,7 +105,16 @@ async fn handle(
     req: Request<Incoming>,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
-    let proxy = get_proxy(req.uri().path().to_string(), &settings.proxies);
+    let Some(proxy) = get_proxy(req.uri().path(), &settings.proxies) else {
+        return Ok(Response::builder()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .body(
+                http_body_util::Empty::<hyper::body::Bytes>::new()
+                    .map_err(|e| match e {})
+                    .boxed(),
+            )
+            .unwrap());
+    };
 
     let addr = build_addr(&settings.host, proxy.remote_port);
 
@@ -107,7 +122,7 @@ async fn handle(
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
-    let (client, connection) = hyper::client::conn::http1::Builder::new()
+    let (mut client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)
         .await?;
 
@@ -128,7 +143,7 @@ async fn handle(
 
     let proxy_uri = proxy_request.uri().clone();
 
-    let res = send_request(client, proxy_request).await?;
+    let res = client.send_request(proxy_request).await?;
     let status = res.status().as_u16();
 
     println!(
@@ -162,8 +177,8 @@ pub fn build_request(
     let remote_addr = build_addr(host, proxy.remote_port);
 
     strip_hop_by_hop_headers(req.headers_mut());
-    add_x_forwarded_for_header(req.headers_mut(), &local_addr)?;
-    add_host_header(req.headers_mut(), &remote_addr)?;
+    add_x_forwarded_for_header(req.headers_mut(), &local_addr);
+    add_host_header(req.headers_mut(), &remote_addr);
 
     if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
         println!("upgrade header: {:#?}", upgrade);
@@ -173,15 +188,6 @@ pub fn build_request(
     *req.uri_mut() = mapped_uri;
 
     Ok(req)
-}
-
-pub async fn send_request(
-    mut client: SendRequest<Incoming>,
-    proxy_request: Request<Incoming>,
-) -> Result<Response<Incoming>, hyper::Error> {
-    let res = client.send_request(proxy_request).await?;
-
-    Ok(res)
 }
 
 fn build_addr(hostname: &str, port: u16) -> String {
@@ -199,10 +205,7 @@ fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
     headers.remove(hyper::header::UPGRADE);
 }
 
-fn add_x_forwarded_for_header(
-    headers: &mut HeaderMap,
-    local_addr: &str,
-) -> Result<(), Error> {
+fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
     match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
         hyper::header::Entry::Vacant(v) => {
             v.insert(
@@ -222,33 +225,40 @@ fn add_x_forwarded_for_header(
             ).expect("Strings concatenated with a ', ' should be a valid header value."));
         }
     };
-
-    Ok(())
 }
 
-fn add_host_header(
-    headers: &mut HeaderMap,
-    remote_addr: &str,
-) -> Result<(), Error> {
+fn add_host_header(headers: &mut HeaderMap, remote_addr: &str) {
     let host = HeaderValue::from_str(remote_addr)
         .expect("`remote_addr` should be valid as header value.");
 
     headers.insert(&*HOST_HEADER_NAME, host);
-
-    Ok(())
 }
 
-fn get_proxy(req_uri: String, proxies: &[ProxyConfig]) -> &ProxyConfig {
-    proxies
-        .iter()
-        .rfind(|x| req_uri.starts_with(&x.local_path))
-        .unwrap()
+fn get_proxy<'a>(
+    req_uri: &str,
+    proxies: &'a [ProxyConfig],
+) -> Option<&'a ProxyConfig> {
+    proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path))
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
-    Ok(req_uri
-        .to_string()
-        .replace(&proxy.local_path, &proxy.remote_path)
-        .parse::<hyper::Uri>()
-        .unwrap())
+    let local_path = proxy.local_path.trim_end_matches('/');
+    let remote_path = proxy.remote_path.trim_end_matches('/');
+
+    req_uri
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("/")
+        .strip_prefix(local_path)
+        .map(|rest| {
+            let path = format!("{}{}", remote_path, rest);
+            if path.is_empty() {
+                "/".to_string()
+            } else {
+                path
+            }
+        })
+        .unwrap_or_else(|| format!("{}/", remote_path))
+        .parse::<Uri>()
+        .map_err(|_| Error::ParseError(ParseError::ProxyDefinition))
 }

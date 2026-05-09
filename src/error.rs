@@ -8,7 +8,7 @@ pub enum ProxyError {
 impl Display for ProxyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProxyError::RequestFailed(ref e) => {
+            ProxyError::RequestFailed(e) => {
                 write!(f, "Request failed: {}", e)
             }
         }
@@ -23,7 +23,7 @@ pub enum IoError {
 impl Display for IoError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IoError::StdIo(ref e) => {
+            IoError::StdIo(e) => {
                 write!(f, "Standard IO error: {}", e)
             }
         }
@@ -40,13 +40,13 @@ pub enum ParseError {
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::ParseInt(ref e) => {
+            ParseError::ParseInt(e) => {
                 write!(f, "Parse int error: {}", e)
             }
             ParseError::ProxyDefinition => {
                 write!(f, "Unable to parse proxy definition.")
             }
-            ParseError::FileConfig(ref e) => {
+            ParseError::FileConfig(e) => {
                 write!(f, "Unable to parse config from config file: {}", e)
             }
         }
@@ -58,22 +58,16 @@ pub enum Error {
     IoError(IoError),
     ParseError(ParseError),
     ProxyError(ProxyError),
+    TlsError(native_tls::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::IoError(ref e) => {
-                write!(f, "IO error: {}", e)
-            }
-
-            Error::ParseError(ref e) => {
-                write!(f, "Parse error: {}", e)
-            }
-
-            Error::ProxyError(ref e) => {
-                write!(f, "Proxy error: {}", e)
-            }
+            Error::IoError(e) => write!(f, "IO error: {}", e),
+            Error::ParseError(e) => write!(f, "Parse error: {}", e),
+            Error::ProxyError(e) => write!(f, "Proxy error: {}", e),
+            Error::TlsError(e) => write!(f, "TLS error: {}", e),
         }
     }
 }
@@ -99,6 +93,12 @@ impl From<serde_yaml::Error> for Error {
 impl From<hyper::Error> for Error {
     fn from(value: hyper::Error) -> Self {
         Error::ProxyError(ProxyError::RequestFailed(value))
+    }
+}
+
+impl From<native_tls::Error> for Error {
+    fn from(value: native_tls::Error) -> Self {
+        Error::TlsError(value)
     }
 }
 
