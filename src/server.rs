@@ -116,9 +116,7 @@ async fn handle(
             .unwrap());
     };
 
-    let addr = build_addr(&settings.host, proxy.remote_port);
-
-    let stream = TcpStream::connect(addr).await?;
+    let stream = TcpStream::connect(&proxy.remote_addr).await?;
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
@@ -138,8 +136,7 @@ async fn handle(
     let request_uri = req.uri().clone();
     let request_method = req.method().clone();
 
-    let proxy_request =
-        build_request(req, &settings.host, settings.local_port, proxy)?;
+    let proxy_request = build_request(req, &settings.local_addr, proxy)?;
 
     let proxy_uri = proxy_request.uri().clone();
 
@@ -169,29 +166,17 @@ fn colourise_status(status_code: u16) -> String {
 
 pub fn build_request(
     mut req: Request<Incoming>,
-    host: &str,
-    local_port: u16,
+    local_addr: &str,
     proxy: &ProxyConfig,
 ) -> Result<Request<Incoming>, Error> {
-    let local_addr = build_addr(host, local_port);
-    let remote_addr = build_addr(host, proxy.remote_port);
-
     strip_hop_by_hop_headers(req.headers_mut());
-    add_x_forwarded_for_header(req.headers_mut(), &local_addr);
-    add_host_header(req.headers_mut(), &remote_addr);
-
-    if let Some(upgrade) = req.headers().get(hyper::header::UPGRADE) {
-        println!("upgrade header: {:#?}", upgrade);
-    }
+    add_x_forwarded_for_header(req.headers_mut(), local_addr);
+    add_host_header(req.headers_mut(), &proxy.remote_addr);
 
     let mapped_uri = map_proxy_uri(req.uri(), proxy)?;
     *req.uri_mut() = mapped_uri;
 
     Ok(req)
-}
-
-fn build_addr(hostname: &str, port: u16) -> String {
-    format!("{}:{}", hostname, port)
 }
 
 fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 #[derive(clap::Parser, Debug)]
 #[clap(
     author = "@nixpig",
-    version = "0.0.1",
+    version = env!("CARGO_PKG_VERSION"),
     about = "A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets."
 )]
 pub struct Cli {

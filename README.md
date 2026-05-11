@@ -3,15 +3,13 @@
 
 # 🐙 joubini
 
-A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
+A super-simple and minimally configurable HTTP reverse proxy with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets.
 
 ![Screenshot of Joubini running as reverse proxy](screenshot.png)
 
 ## ⚠️ WORK IN PROGRESS
 
-This is a **work in progress**. It's not stable, it's not secure, and performance isn't great.
-
-At this time, I wouldn't recommend using this for anything more than playing around. If you're looking for something production-ready, there are plenty of [good alternatives](#Alternatives) out there.
+This is a **work in progress**. At this time, I wouldn't recommend using this for anything more than playing around. If you're looking for something production-ready, there are plenty of [good alternatives](#Alternatives) out there.
 
 ## Features
 

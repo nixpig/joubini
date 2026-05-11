@@ -5,7 +5,7 @@ use joubini::settings::{ProxyConfig, Settings, get_settings};
 #[test]
 fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
     let p1 = ":3000"; // :remote_port
-    let o1 = ProxyConfig::from_str(p1);
+    let o1 = ProxyConfig::new(p1, "localhost");
 
     assert_eq!(
         o1.unwrap(),
@@ -13,11 +13,12 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
             local_path: String::from("/"),
             remote_port: 3000,
             remote_path: String::from("/"),
+            remote_addr: String::from("localhost:3000"),
         },
     );
 
     let p2 = ":3000/api"; // :remote_port/remote_path
-    let o2 = ProxyConfig::from_str(p2);
+    let o2 = ProxyConfig::new(p2, "localhost");
 
     assert_eq!(
         o2.unwrap(),
@@ -25,11 +26,12 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
             local_path: String::from("/"),
             remote_port: 3000,
             remote_path: String::from("/api"),
+            remote_addr: String::from("localhost:3000"),
         }
     );
 
     let p3 = "api:3000"; // local_path:remote_port
-    let o3 = ProxyConfig::from_str(p3);
+    let o3 = ProxyConfig::new(p3, "localhost");
 
     assert_eq!(
         o3.unwrap(),
@@ -37,11 +39,12 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
             local_path: String::from("/api"),
             remote_port: 3000,
             remote_path: String::from("/"),
+            remote_addr: String::from("localhost:3000"),
         }
     );
 
     let p4 = "api:3000/api"; // local_path:remote_port/remote_path
-    let o4 = ProxyConfig::from_str(p4);
+    let o4 = ProxyConfig::new(p4, "localhost");
 
     assert_eq!(
         o4.unwrap(),
@@ -49,11 +52,12 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
             local_path: String::from("/api"),
             remote_port: 3000,
             remote_path: String::from("/api"),
+            remote_addr: String::from("localhost:3000"),
         }
     );
 
     let p5 = "local/v1:3000/api/v1"; // nested_local_path:remote_port/nested_remote_path
-    let o5 = ProxyConfig::from_str(p5);
+    let o5 = ProxyConfig::new(p5, "localhost");
 
     assert_eq!(
         o5.unwrap(),
@@ -61,6 +65,7 @@ fn test_parse_proxy_config_from_str() -> Result<(), Box<dyn Error>> {
             local_path: String::from("/local/v1"),
             remote_port: 3000,
             remote_path: String::from("/api/v1"),
+            remote_addr: String::from("localhost:3000"),
         }
     );
 
@@ -80,6 +85,7 @@ fn test_parse_settings_from_config_file_with_optional_fields()
             config: Some(PathBuf::from("tests/config.yml")),
             host: String::from("localhost"),
             local_port: 7878,
+            local_addr: String::from("localhost:7878"),
             tls: true,
             pem: Some(PathBuf::from("/tmp/localhost.crt")),
             key: Some(PathBuf::from("/tmp/localhost.key")),
@@ -88,26 +94,31 @@ fn test_parse_settings_from_config_file_with_optional_fields()
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/local/v1"),
                     remote_port: 3000,
                     remote_path: String::from("/remote/v1"),
+                    remote_addr: String::from("localhost:3000"),
                 }
             ]
         }
@@ -130,6 +141,7 @@ fn test_parse_settings_from_config_file_without_optional_fields()
             config: Some(PathBuf::from("tests/config-without-options.yml")),
             host: String::from("127.0.0.1"),
             local_port: 80,
+            local_addr: String::from("127.0.0.1:80"),
             tls: false,
             pem: None,
             key: None,
@@ -138,26 +150,31 @@ fn test_parse_settings_from_config_file_without_optional_fields()
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("127.0.0.1:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("127.0.0.1:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("127.0.0.1:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("127.0.0.1:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/local/v1"),
                     remote_port: 3000,
                     remote_path: String::from("/remote/v1"),
+                    remote_addr: String::from("127.0.0.1:3000"),
                 }
             ]
         }
@@ -175,6 +192,7 @@ fn test_create_new_settings() -> Result<(), Box<dyn Error>> {
             config: None,
             host: String::from("127.0.0.1"),
             local_port: 80,
+            local_addr: String::from("127.0.0.1:80"),
             proxies: vec![],
             tls: false,
             pem: None,
@@ -194,6 +212,7 @@ fn test_create_default_settings() -> Result<(), Box<dyn Error>> {
             config: None,
             host: String::from("127.0.0.1"),
             local_port: 80,
+            local_addr: String::from("127.0.0.1:80"),
             proxies: vec![],
             tls: false,
             pem: None,
@@ -221,11 +240,11 @@ fn test_print_settings() -> Result<(), Box<dyn Error>> {
 
     settings
         .proxies
-        .push(ProxyConfig::from_str("foo:3000/bar").unwrap());
+        .push(ProxyConfig::new("foo:3000/bar", "localhost").unwrap());
 
     settings
         .proxies
-        .push(ProxyConfig::from_str("baz:3001/qux").unwrap());
+        .push(ProxyConfig::new("baz:3001/qux", "localhost").unwrap());
 
     assert_eq!(
         settings.to_string(),
@@ -240,7 +259,7 @@ fn test_print_settings() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_invalid_proxy_config() -> Result<(), Box<dyn Error>> {
     let p = "invalid proxy config";
-    let o = ProxyConfig::from_str(p).unwrap_err().to_string();
+    let o = ProxyConfig::new(p, "localhost").unwrap_err().to_string();
 
     assert_eq!(
         o,
@@ -256,9 +275,9 @@ fn test_fail_invalid_port() -> Result<(), Box<dyn Error>> {
     let p2 = ":bar/baz";
     let p3 = "qux:thud/fred";
 
-    let c1 = ProxyConfig::from_str(p1).unwrap_err().to_string();
-    let c2 = ProxyConfig::from_str(p2).unwrap_err().to_string();
-    let c3 = ProxyConfig::from_str(p3).unwrap_err().to_string();
+    let c1 = ProxyConfig::new(p1, "localhost").unwrap_err().to_string();
+    let c2 = ProxyConfig::new(p2, "localhost").unwrap_err().to_string();
+    let c3 = ProxyConfig::new(p3, "localhost").unwrap_err().to_string();
 
     assert_eq!(
         c1,
@@ -319,13 +338,15 @@ fn test_get_settings_without_config_file() -> Result<(), Box<dyn Error>> {
             config: None,
             host: String::from("127.0.0.1"),
             local_port: 7878,
+            local_addr: String::from("127.0.0.1:7878"),
             tls: true,
             pem: Some(PathBuf::from_str("foo/bar.pem").unwrap()),
             key: Some(PathBuf::from_str("bar/baz.key").unwrap()),
             proxies: vec![ProxyConfig {
                 local_path: String::from("/"),
                 remote_port: 3000,
-                remote_path: String::from("/")
+                remote_path: String::from("/"),
+                remote_addr: String::from("127.0.0.1:3000")
             }]
         }
     );
@@ -349,6 +370,7 @@ fn test_settings_with_config_file() -> Result<(), Box<dyn Error>> {
             config: Some(PathBuf::from("tests/config.yml")),
             host: String::from("localhost"),
             local_port: 7878,
+            local_addr: String::from("localhost:7878"),
             tls: true,
             pem: Some(PathBuf::from("/tmp/localhost.crt")),
             key: Some(PathBuf::from("/tmp/localhost.key")),
@@ -357,30 +379,53 @@ fn test_settings_with_config_file() -> Result<(), Box<dyn Error>> {
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/api"),
                     remote_port: 3000,
                     remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
                 },
                 ProxyConfig {
                     local_path: String::from("/local/v1"),
                     remote_port: 3000,
                     remote_path: String::from("/remote/v1"),
+                    remote_addr: String::from("localhost:3000"),
                 }
             ]
         }
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_cli_host_overrides_config_file_host_in_proxy_remote_addr()
+-> Result<(), Box<dyn Error>> {
+    let cli_args = vec![
+        OsString::from("joubini"),
+        OsString::from("--config=tests/config.yml"),
+        OsString::from("--host=127.0.0.1"),
+    ];
+
+    let settings = get_settings(cli_args)?;
+
+    for p in &settings.proxies {
+        assert!(p.remote_addr.starts_with("127.0.0.1:"));
+    }
 
     Ok(())
 }

@@ -2,12 +2,13 @@ use crate::error::Error;
 use crate::{cli::Cli, error::ParseError};
 use clap::Parser;
 use std::ffi::OsString;
-use std::{fmt::Display, fs, path::PathBuf, str::FromStr};
+use std::{fmt::Display, fs, path::PathBuf};
 
 #[derive(Ord, Eq, PartialOrd, Debug, PartialEq)]
 pub struct Settings {
     pub host: String,
     pub local_port: u16,
+    pub local_addr: String,
     pub proxies: Vec<ProxyConfig>,
     pub config: Option<PathBuf>,
     pub tls: bool,
@@ -17,9 +18,14 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
+        let host = default_host();
+        let local_port = default_port();
+        let local_addr = format!("{}:{}", host, local_port);
+
         Settings {
-            host: String::from("127.0.0.1"),
-            local_port: 80,
+            host,
+            local_port,
+            local_addr,
             proxies: vec![],
             config: None,
             tls: false,
@@ -55,31 +61,28 @@ pub struct ProxyConfig {
     pub local_path: String,
     pub remote_port: u16,
     pub remote_path: String,
+    pub remote_addr: String,
 }
 
-impl FromStr for ProxyConfig {
-    type Err = Error;
+impl ProxyConfig {
+    pub fn new(s: &str, host: &str) -> Result<Self, Error> {
+        let Some((local_path, remote)) = s.split_once(':') else {
+            return Err(Error::ParseError(ParseError::ProxyDefinition));
+        };
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some((local_path, remote)) = s.split_once(':') {
-            let (remote_port, remote_path) = if let Some((
-                remote_port,
-                remote_path,
-            )) = remote.split_once('/')
-            {
-                (remote_port, remote_path)
-            } else {
-                (remote, "")
-            };
+        let (remote_port, remote_path) = match remote.split_once('/') {
+            Some((port, path)) => (port, path),
+            None => (remote, ""),
+        };
 
-            Ok(ProxyConfig {
-                local_path: ["/", local_path].join(""),
-                remote_port: remote_port.parse::<u16>()?,
-                remote_path: ["/", remote_path].join(""),
-            })
-        } else {
-            Err(Error::ParseError(ParseError::ProxyDefinition))
-        }
+        let remote_port = remote_port.parse::<u16>()?;
+
+        Ok(ProxyConfig {
+            local_path: format!("/{}", local_path),
+            remote_port,
+            remote_path: format!("/{}", remote_path),
+            remote_addr: format!("{}:{}", host, remote_port),
+        })
     }
 }
 
@@ -116,14 +119,19 @@ impl TryFrom<PathBuf> for Settings {
         let proxies = config_yaml
             .proxies
             .iter()
-            .map(|p| ProxyConfig::from_str(p))
+            .map(|p| ProxyConfig::new(p, &config_yaml.host))
             .collect::<Result<Vec<ProxyConfig>, Error>>()?;
 
         let tls = config_yaml.tls.unwrap_or(false);
 
+        let host = config_yaml.host;
+        let local_port = config_yaml.local_port;
+        let local_addr = format!("{}:{}", host, local_port);
+
         Ok(Settings {
-            host: config_yaml.host,
-            local_port: config_yaml.local_port,
+            host,
+            local_port,
+            local_addr,
             proxies,
             config: Some(path),
             tls,
@@ -136,25 +144,41 @@ impl TryFrom<PathBuf> for Settings {
 pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
     let cli = Cli::parse_from(cli_args);
 
-    let mut file = cli
+    let file = cli
         .config
         .as_ref()
         .map(|p| Settings::try_from(PathBuf::from(p)))
         .transpose()?
         .unwrap_or_default();
 
+    let host = cli.host.as_deref().unwrap_or(&file.host);
+
+    let mut proxies = file
+        .proxies
+        .into_iter()
+        .map(|p| ProxyConfig {
+            remote_addr: format!("{}:{}", host, p.remote_port),
+            ..p
+        })
+        .collect::<Vec<ProxyConfig>>();
+
     let mut cli_proxies = cli
         .proxies
         .iter()
-        .map(|p| ProxyConfig::from_str(p))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|p| ProxyConfig::new(p, host))
+        .collect::<Result<Vec<ProxyConfig>, _>>()?;
 
-    file.proxies.append(&mut cli_proxies);
+    proxies.append(&mut cli_proxies);
+
+    let host = cli.host.unwrap_or(file.host);
+    let local_port = cli.local_port.unwrap_or(file.local_port);
+    let local_addr = format!("{}:{}", host, local_port);
 
     Ok(Settings {
-        host: cli.host.unwrap_or(file.host),
-        local_port: cli.local_port.unwrap_or(file.local_port),
-        proxies: file.proxies,
+        host,
+        local_port,
+        local_addr,
+        proxies,
         config: cli.config.or(file.config),
         tls: cli.tls || file.tls,
         pem: cli.pem.or(file.pem),
