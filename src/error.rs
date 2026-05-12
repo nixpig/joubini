@@ -58,7 +58,7 @@ pub enum Error {
     IoError(IoError),
     ParseError(ParseError),
     ProxyError(ProxyError),
-    TlsError(native_tls::Error),
+    TlsError(rustls::Error),
 }
 
 impl Display for Error {
@@ -96,8 +96,8 @@ impl From<hyper::Error> for Error {
     }
 }
 
-impl From<native_tls::Error> for Error {
-    fn from(value: native_tls::Error) -> Self {
+impl From<rustls::Error> for Error {
+    fn from(value: rustls::Error) -> Self {
         Error::TlsError(value)
     }
 }

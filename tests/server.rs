@@ -652,11 +652,13 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
     let key = fs::read("/tmp/localhost.key").unwrap();
     let root = fs::read("/tmp/localCA.pem").unwrap();
 
-    let cert = reqwest::Identity::from_pkcs8_pem(&pem, &key)?;
+    let mut combined = pem.clone();
+    combined.extend_from_slice(&key);
+    let cert = reqwest::Identity::from_pem(&combined)?;
     let ca = reqwest::Certificate::from_pem(&root)?;
 
     let client = reqwest::Client::builder()
-        .use_native_tls()
+        .use_rustls_tls()
         .identity(cert)
         .add_root_certificate(ca)
         .pool_max_idle_per_host(0)

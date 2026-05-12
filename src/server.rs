@@ -3,6 +3,7 @@ use crate::{
     error::ParseError,
     settings::{ProxyConfig, Settings},
 };
+use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::header;
 use hyper::header::Entry::{Occupied, Vacant};
 use hyper::rt::{Read, Write};
@@ -10,21 +11,22 @@ use hyper::{
     HeaderMap, Uri,
     header::{HeaderName, HeaderValue},
 };
+use hyper::{Request, Response, body::Incoming, service::service_fn};
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use native_tls::Identity;
+use rustls::ServerConfig;
+use rustls_pemfile::{certs, pkcs8_private_keys};
+use std::io::BufReader;
 use std::marker::{Send, Unpin};
 use std::sync::LazyLock;
 use std::{fs, io, sync::Arc};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_rustls::TlsAcceptor;
 
 static HOST_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("host"));
 
 static X_FORWARDED_FOR_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("x-forwarded-for"));
-
-use http_body_util::{BodyExt, combinators::BoxBody};
-use hyper::{Request, Response, body::Incoming, service::service_fn};
-use tokio::net::{TcpListener, TcpStream};
 
 pub async fn start(
     listener: Arc<TcpListener>,
@@ -43,13 +45,27 @@ pub async fn start(
                 io::Error::new(io::ErrorKind::InvalidInput, "no key provided")
             })?)?;
 
-            let cert = Identity::from_pkcs8(&pem, &key)?;
+            let certificates = certs(&mut BufReader::new(pem.as_slice()))
+                .collect::<Result<Vec<_>, _>>()?;
 
-            let tls_acceptor =
-                native_tls::TlsAcceptor::builder(cert).build()?;
+            let private_key =
+                pkcs8_private_keys(&mut BufReader::new(key.as_slice()))
+                    .next()
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "no private key",
+                        )
+                    })??;
 
-            let tls_acceptor =
-                tokio_native_tls::TlsAcceptor::from(tls_acceptor);
+            let config = ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(
+                    certificates,
+                    rustls::pki_types::PrivateKeyDer::Pkcs8(private_key),
+                )?;
+
+            let tls_acceptor = TlsAcceptor::from(Arc::new(config));
 
             loop {
                 let settings = settings.clone();
@@ -197,7 +213,7 @@ fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
                 &[
                     v.get()
                         .to_str()
-                        .expect("Header valud to be parsable to string."),
+                        .expect("Header value to be parsable to string."),
                     local_addr,
                 ]
                 .join(", "),
