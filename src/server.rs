@@ -3,14 +3,18 @@ use crate::{
     error::ParseError,
     settings::{ProxyConfig, Settings},
 };
+use hyper::header;
+use hyper::header::Entry::{Occupied, Vacant};
+use hyper::rt::{Read, Write};
 use hyper::{
     HeaderMap, Uri,
     header::{HeaderName, HeaderValue},
 };
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use native_tls::Identity;
+use std::marker::{Send, Unpin};
 use std::sync::LazyLock;
-use std::{fs, sync::Arc};
+use std::{fs, io, sync::Arc};
 
 static HOST_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("host"));
@@ -32,17 +36,11 @@ pub async fn start(
     match settings.tls {
         true => {
             let pem = fs::read(settings.pem.as_ref().ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "no pem provided",
-                )
+                io::Error::new(io::ErrorKind::InvalidInput, "no pem provided")
             })?)?;
 
             let key = fs::read(settings.key.as_ref().ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "no key provided",
-                )
+                io::Error::new(io::ErrorKind::InvalidInput, "no key provided")
             })?)?;
 
             let cert = Identity::from_pkcs8(&pem, &key)?;
@@ -59,7 +57,7 @@ pub async fn start(
 
                 match tls_acceptor.accept(stream).await {
                     Ok(tls_stream) => {
-                        let io = hyper_util::rt::TokioIo::new(tls_stream);
+                        let io = TokioIo::new(tls_stream);
                         spawn_server(io, settings)
                     }
                     Err(e) => eprintln!(
@@ -72,7 +70,7 @@ pub async fn start(
         false => loop {
             let settings = settings.clone();
             let (stream, _) = listener.accept().await?;
-            let io = hyper_util::rt::TokioIo::new(stream);
+            let io = TokioIo::new(stream);
 
             spawn_server(io, settings);
         },
@@ -80,11 +78,7 @@ pub async fn start(
 }
 
 fn spawn_server(
-    io_stream: impl hyper::rt::Read
-    + hyper::rt::Write
-    + std::marker::Unpin
-    + std::marker::Send
-    + 'static,
+    io_stream: impl Read + Write + Unpin + Send + 'static,
     settings: Arc<Settings>,
 ) {
     tokio::task::spawn(async move {
@@ -180,25 +174,25 @@ pub fn build_request(
 }
 
 fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
-    headers.remove(hyper::header::CONNECTION);
+    headers.remove(header::CONNECTION);
     headers.remove(HeaderName::from_static("keep-alive"));
-    headers.remove(hyper::header::PROXY_AUTHENTICATE);
-    headers.remove(hyper::header::PROXY_AUTHORIZATION);
-    headers.remove(hyper::header::TE);
-    headers.remove(hyper::header::TRAILER);
-    headers.remove(hyper::header::TRANSFER_ENCODING);
-    headers.remove(hyper::header::UPGRADE);
+    headers.remove(header::PROXY_AUTHENTICATE);
+    headers.remove(header::PROXY_AUTHORIZATION);
+    headers.remove(header::TE);
+    headers.remove(header::TRAILER);
+    headers.remove(header::TRANSFER_ENCODING);
+    headers.remove(header::UPGRADE);
 }
 
 fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
     match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
-        hyper::header::Entry::Vacant(v) => {
+        Vacant(v) => {
             v.insert(
                 HeaderValue::from_str(local_addr)
                     .expect("`local_addr` should be valid as header value."),
             );
         }
-        hyper::header::Entry::Occupied(mut v) => {
+        Occupied(mut v) => {
             v.insert(HeaderValue::from_str(
                 &[
                     v.get()
@@ -220,10 +214,22 @@ fn add_host_header(headers: &mut HeaderMap, remote_addr: &str) {
 }
 
 fn get_proxy<'a>(
-    req_uri: &str,
+    req_path: &str,
     proxies: &'a [ProxyConfig],
 ) -> Option<&'a ProxyConfig> {
-    proxies.iter().rfind(|x| req_uri.starts_with(&x.local_path))
+    let req_segments = req_path
+        .split('/')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<&str>>();
+
+    proxies.iter().rfind(|p| {
+        req_segments.starts_with(
+            &p.local_path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>(),
+        )
+    })
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
