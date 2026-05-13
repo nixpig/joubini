@@ -571,7 +571,7 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
 
     let res = client
         .get("http://localhost:7878/append-forwarded")
-        .header("x-forwarded-for", "first:2323")
+        .header("x-forwarded-for", "127.0.0.1")
         .send()
         .await
         .unwrap();
@@ -796,7 +796,7 @@ async fn post_form_ok(form: web::Form<FormData>) -> HttpResponse {
 async fn add_forwarded_ok(req: HttpRequest) -> HttpResponse {
     let x_forwarded_for_header = req.headers().get(header::X_FORWARDED_FOR);
 
-    if x_forwarded_for_header.is_some_and(|h| h == "localhost:7878") {
+    if x_forwarded_for_header.is_some_and(|h| h == "::1") {
         HttpResponse::Ok().finish()
     } else {
         HttpResponse::ImATeapot().finish()
@@ -806,8 +806,7 @@ async fn add_forwarded_ok(req: HttpRequest) -> HttpResponse {
 async fn append_forwarded_ok(req: HttpRequest) -> HttpResponse {
     let x_forwarded_for_header = req.headers().get(header::X_FORWARDED_FOR);
 
-    if x_forwarded_for_header.is_some_and(|h| h == "first:2323, localhost:7878")
-    {
+    if x_forwarded_for_header.is_some_and(|h| h == "127.0.0.1, ::1") {
         HttpResponse::Ok().finish()
     } else {
         HttpResponse::ImATeapot().finish()

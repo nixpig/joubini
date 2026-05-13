@@ -53,12 +53,12 @@ pub async fn start(
 
             loop {
                 let settings = settings.clone();
-                let (stream, _) = listener.accept().await?;
+                let (stream, client_addr) = listener.accept().await?;
 
                 match tls_acceptor.accept(stream).await {
                     Ok(tls_stream) => {
                         let io = TokioIo::new(tls_stream);
-                        spawn_server(io, settings)
+                        spawn_server(io, client_addr.ip().to_string(), settings)
                     }
                     Err(e) => eprintln!(
                         "\x1b[31mERR\x1b[0m TLS handshake failed: {}",
@@ -69,16 +69,17 @@ pub async fn start(
         }
         false => loop {
             let settings = settings.clone();
-            let (stream, _) = listener.accept().await?;
+            let (stream, client_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
 
-            spawn_server(io, settings);
+            spawn_server(io, client_addr.ip().to_string(), settings);
         },
     }
 }
 
 fn spawn_server(
     io_stream: impl Read + Write + Unpin + Send + 'static,
+    client_addr: String,
     settings: Arc<Settings>,
 ) {
     tokio::task::spawn(async move {
@@ -86,7 +87,9 @@ fn spawn_server(
             hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
                 .serve_connection(
                     io_stream,
-                    service_fn(move |req| handle(req, settings.clone())),
+                    service_fn(move |req| {
+                        handle(req, client_addr.clone(), settings.clone())
+                    }),
                 )
                 .await
         {
@@ -97,6 +100,7 @@ fn spawn_server(
 
 async fn handle(
     req: Request<Incoming>,
+    client_addr: String,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     let Some(proxy) = get_proxy(req.uri().path(), &settings.proxies) else {
@@ -130,7 +134,7 @@ async fn handle(
     let request_uri = req.uri().clone();
     let request_method = req.method().clone();
 
-    let proxy_request = build_request(req, &settings.local_addr, proxy)?;
+    let proxy_request = build_request(req, &client_addr, proxy)?;
 
     let proxy_uri = proxy_request.uri().clone();
 
@@ -160,11 +164,11 @@ fn colourise_status(status_code: u16) -> String {
 
 pub fn build_request(
     mut req: Request<Incoming>,
-    local_addr: &str,
+    client_addr: &str,
     proxy: &ProxyConfig,
 ) -> Result<Request<Incoming>, Error> {
     strip_hop_by_hop_headers(req.headers_mut());
-    add_x_forwarded_for_header(req.headers_mut(), local_addr);
+    add_x_forwarded_for_header(req.headers_mut(), client_addr);
     add_host_header(req.headers_mut(), &proxy.remote_addr);
 
     let mapped_uri = map_proxy_uri(req.uri(), proxy)?;
@@ -184,12 +188,12 @@ fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
     headers.remove(header::UPGRADE);
 }
 
-fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
+fn add_x_forwarded_for_header(headers: &mut HeaderMap, client_addr: &str) {
     match headers.entry(&*X_FORWARDED_FOR_HEADER_NAME) {
         Vacant(v) => {
             v.insert(
-                HeaderValue::from_str(local_addr)
-                    .expect("`local_addr` should be valid as header value."),
+                HeaderValue::from_str(client_addr)
+                    .expect("`client_addr` should be valid as header value."),
             );
         }
         Occupied(mut v) => {
@@ -198,7 +202,7 @@ fn add_x_forwarded_for_header(headers: &mut HeaderMap, local_addr: &str) {
                     v.get()
                         .to_str()
                         .expect("Header value to be parsable to string."),
-                    local_addr,
+                    client_addr,
                 ]
                 .join(", "),
             ).expect("Strings concatenated with a ', ' should be a valid header value."));
