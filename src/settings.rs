@@ -1,5 +1,7 @@
-use crate::error::Error;
-use crate::{cli::Cli, error::ParseError};
+use crate::cli::Cli;
+use anyhow::Error;
+use anyhow::Result;
+use anyhow::anyhow;
 use clap::Parser;
 use std::ffi::OsString;
 use std::{fmt::Display, fs, path::PathBuf};
@@ -67,7 +69,7 @@ pub struct ProxyConfig {
 impl ProxyConfig {
     pub fn new(s: &str, host: &str) -> Result<Self, Error> {
         let Some((local_path, remote)) = s.split_once(':') else {
-            return Err(Error::ParseError(ParseError::ProxyDefinition));
+            return Err(anyhow!("Unable to parse proxy definition."));
         };
 
         let (remote_port, remote_path) = match remote.split_once('/') {

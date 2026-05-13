@@ -1,8 +1,5 @@
-use crate::{
-    error::Error,
-    error::ParseError,
-    settings::{ProxyConfig, Settings},
-};
+use crate::settings::{ProxyConfig, Settings};
+use anyhow::{Error, Result, anyhow};
 use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::header;
 use hyper::header::Entry::{Occupied, Vacant};
@@ -254,5 +251,5 @@ pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
         })
         .unwrap_or_else(|| format!("{}/", remote_path))
         .parse::<Uri>()
-        .map_err(|_| Error::ParseError(ParseError::ProxyDefinition))
+        .map_err(|e| anyhow!(e))
 }

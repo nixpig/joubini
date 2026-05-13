@@ -261,10 +261,7 @@ fn test_invalid_proxy_config() -> Result<(), Box<dyn Error>> {
     let p = "invalid proxy config";
     let o = ProxyConfig::new(p, "localhost").unwrap_err().to_string();
 
-    assert_eq!(
-        o,
-        String::from("Parse error: Unable to parse proxy definition.")
-    );
+    assert_eq!(o, String::from("Unable to parse proxy definition."));
 
     Ok(())
 }
@@ -279,24 +276,9 @@ fn test_fail_invalid_port() -> Result<(), Box<dyn Error>> {
     let c2 = ProxyConfig::new(p2, "localhost").unwrap_err().to_string();
     let c3 = ProxyConfig::new(p3, "localhost").unwrap_err().to_string();
 
-    assert_eq!(
-        c1,
-        String::from(
-            "Parse error: Parse int error: invalid digit found in string"
-        )
-    );
-    assert_eq!(
-        c2,
-        String::from(
-            "Parse error: Parse int error: invalid digit found in string"
-        )
-    );
-    assert_eq!(
-        c3,
-        String::from(
-            "Parse error: Parse int error: invalid digit found in string"
-        )
-    );
+    assert_eq!(c1, String::from("invalid digit found in string"));
+    assert_eq!(c2, String::from("invalid digit found in string"));
+    assert_eq!(c3, String::from("invalid digit found in string"));
 
     Ok(())
 }
@@ -307,12 +289,7 @@ fn test_missing_config_file() -> Result<(), Box<dyn Error>> {
 
     let err = settings.unwrap_err().to_string();
 
-    assert_eq!(
-        err,
-        String::from(
-            "IO error: Standard IO error: No such file or directory (os error 2)"
-        )
-    );
+    assert_eq!(err, String::from("No such file or directory (os error 2)"));
 
     Ok(())
 }

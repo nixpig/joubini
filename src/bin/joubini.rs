@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use joubini::{error::Error, server::start, settings::get_settings};
+use anyhow::Error;
+use joubini::{server::start, settings::get_settings};
 use tokio::net::TcpListener;
 
 #[tokio::main]
