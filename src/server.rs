@@ -13,12 +13,13 @@ use hyper::{
 };
 use hyper::{Request, Response, body::Incoming, service::service_fn};
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use rustls::ServerConfig;
-use rustls_pemfile::{certs, pkcs8_private_keys};
-use std::io::BufReader;
+use rustls::{
+    ServerConfig,
+    pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
+};
 use std::marker::{Send, Unpin};
+use std::sync::Arc;
 use std::sync::LazyLock;
-use std::{fs, io, sync::Arc};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsAcceptor;
 
@@ -37,33 +38,19 @@ pub async fn start(
 
     match settings.tls {
         true => {
-            let pem = fs::read(settings.pem.as_ref().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "no pem provided")
-            })?)?;
-
-            let key = fs::read(settings.key.as_ref().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "no key provided")
-            })?)?;
-
-            let certificates = certs(&mut BufReader::new(pem.as_slice()))
-                .collect::<Result<Vec<_>, _>>()?;
+            let certs: Vec<CertificateDer<'static>> =
+                CertificateDer::pem_file_iter(settings.pem.as_ref().unwrap())
+                    .unwrap()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
 
             let private_key =
-                pkcs8_private_keys(&mut BufReader::new(key.as_slice()))
-                    .next()
-                    .ok_or_else(|| {
-                        io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "no private key",
-                        )
-                    })??;
+                PrivateKeyDer::from_pem_file(settings.key.as_ref().unwrap())
+                    .unwrap();
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
-                .with_single_cert(
-                    certificates,
-                    rustls::pki_types::PrivateKeyDer::Pkcs8(private_key),
-                )?;
+                .with_single_cert(certs, private_key)?;
 
             let tls_acceptor = TlsAcceptor::from(Arc::new(config));
 
