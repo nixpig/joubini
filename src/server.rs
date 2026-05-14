@@ -26,13 +26,11 @@ static HOST_HEADER_NAME: LazyLock<HeaderName> =
 static X_FORWARDED_FOR_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("x-forwarded-for"));
 
+#[tracing::instrument]
 pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
-    println!("Listening on: {}", listener.local_addr()?);
-    println!("{}", settings);
-
     match settings.tls {
         true => {
             let certs: Vec<CertificateDer<'static>> =
@@ -60,10 +58,9 @@ pub async fn start(
                         let io = TokioIo::new(tls_stream);
                         spawn_server(io, client_addr.ip().to_string(), settings)
                     }
-                    Err(e) => eprintln!(
-                        "\x1b[31mERR\x1b[0m TLS handshake failed: {}",
-                        e
-                    ),
+                    Err(e) => {
+                        tracing::error! { %e, "failed to complete TLS handshake" }
+                    }
                 }
             }
         }
@@ -93,11 +90,12 @@ fn spawn_server(
                 )
                 .await
         {
-            eprintln!("\x1b[31mERR\x1b[0m Error serving connection: {}", e);
+            tracing::error! { %e, "failed to serve connection" };
         }
     });
 }
 
+#[tracing::instrument]
 async fn handle(
     req: Request<Incoming>,
     client_addr: String,
@@ -124,10 +122,7 @@ async fn handle(
 
     tokio::task::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!(
-                "\x1b[31mERR\x1b[0m Unable to establish connection: {:?}",
-                e
-            );
+            tracing::error! { %e, "failed to establish connection" };
         }
     });
 
@@ -140,26 +135,13 @@ async fn handle(
 
     let res = client.send_request(proxy_request).await?;
     let status = res.status().as_u16();
+    let request_path = request_uri.path();
+    let remote_port = proxy.remote_port;
+    let proxy_path = proxy_uri.path();
 
-    println!(
-        "{} {} {} \x1b[94m➡\x1b[0m :{}{}",
-        colourise_status(status),
-        request_method,
-        request_uri.path(),
-        proxy.remote_port,
-        proxy_uri.path(),
-    );
+    tracing::info! { %status, %request_method, %request_path, %remote_port, %proxy_path };
 
     Ok(res.map(|b| b.boxed()))
-}
-
-fn colourise_status(status_code: u16) -> String {
-    match status_code {
-        200..=399 => format!("\x1b[92m{}\x1b[0m", status_code),
-        400..=499 => format!("\x1b[93m{}\x1b[0m", status_code),
-        500..=599 => format!("\x1b[91m{}\x1b[0m", status_code),
-        _ => status_code.to_string(),
-    }
 }
 
 pub fn build_request(

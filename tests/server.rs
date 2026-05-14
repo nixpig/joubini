@@ -82,8 +82,6 @@ async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
         .send()
         .await?;
 
-    // println!("res: {:#?}", res);
-    //
     assert_eq!(res.status(), StatusCode::OK);
 
     Ok(())
