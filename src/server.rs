@@ -42,12 +42,10 @@ pub async fn start(
             let key = settings.key.as_ref().unwrap();
 
             let certs: Vec<CertificateDer<'static>> =
-                CertificateDer::pem_file_iter(pem)
-                    .unwrap()
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap();
+                CertificateDer::pem_file_iter(pem)?
+                    .collect::<Result<Vec<_>, _>>()?;
 
-            let private_key = PrivateKeyDer::from_pem_file(key).unwrap();
+            let private_key = PrivateKeyDer::from_pem_file(key)?;
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
@@ -223,15 +221,16 @@ fn add_x_forwarded_for_header(headers: &mut HeaderMap, client_addr: &str) {
             );
         }
         Occupied(mut v) => {
-            v.insert(HeaderValue::from_str(
-                &[
-                    v.get()
-                        .to_str()
-                        .expect("Header value to be parsable to string."),
-                    client_addr,
-                ]
-                .join(", "),
-            ).expect("Strings concatenated with a ', ' should be a valid header value."));
+            let combined = v
+                .get()
+                .to_str()
+                .map(|existing| format!("{existing}, {client_addr}"))
+                .unwrap_or_else(|_| client_addr.to_string());
+
+            v.insert(
+                HeaderValue::from_str(&combined)
+                    .expect("should be valid as header value."),
+            );
         }
     };
 }
