@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsAcceptor;
+use tracing::Instrument;
 
 static HOST_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("host"));
@@ -26,50 +27,68 @@ static HOST_HEADER_NAME: LazyLock<HeaderName> =
 static X_FORWARDED_FOR_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("x-forwarded-for"));
 
-#[tracing::instrument]
+static KEEP_ALIVE_HEADER_NAME: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("keep-alive"));
+
 pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
     match settings.tls {
         true => {
+            // If tls is true, then pem and key should be set.
+            // TODO: Validate this when building settings so that unwrap here is safe.
+            let pem = settings.pem.as_ref().unwrap();
+            let key = settings.key.as_ref().unwrap();
+
             let certs: Vec<CertificateDer<'static>> =
-                CertificateDer::pem_file_iter(settings.pem.as_ref().unwrap())
+                CertificateDer::pem_file_iter(pem)
                     .unwrap()
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap();
 
-            let private_key =
-                PrivateKeyDer::from_pem_file(settings.key.as_ref().unwrap())
-                    .unwrap();
+            let private_key = PrivateKeyDer::from_pem_file(key).unwrap();
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
                 .with_single_cert(certs, private_key)?;
+            let config = Arc::new(config);
 
-            let tls_acceptor = TlsAcceptor::from(Arc::new(config));
+            let tls_acceptor = TlsAcceptor::from(config);
 
             loop {
-                let settings = settings.clone();
                 let (stream, client_addr) = listener.accept().await?;
+                let span = tracing::info_span!("connection", %client_addr);
 
                 match tls_acceptor.accept(stream).await {
-                    Ok(tls_stream) => {
-                        let io = TokioIo::new(tls_stream);
-                        spawn_server(io, client_addr.ip().to_string(), settings)
-                    }
-                    Err(e) => {
-                        tracing::error! { %e, "failed to complete TLS handshake" }
-                    }
+                    Ok(tls_stream) => span.in_scope(|| {
+                        tracing::info!("connection accepted");
+
+                        spawn_server(
+                            TokioIo::new(tls_stream),
+                            client_addr.ip().to_string(),
+                            settings.clone(),
+                        )
+                    }),
+                    Err(e) => span.in_scope(|| {
+                        tracing::error!(%e, "failed to complete TLS handshake")
+                    })
                 }
             }
         }
         false => loop {
-            let settings = settings.clone();
             let (stream, client_addr) = listener.accept().await?;
-            let io = TokioIo::new(stream);
+            let span = tracing::info_span!("connection", %client_addr);
 
-            spawn_server(io, client_addr.ip().to_string(), settings);
+            span.in_scope(|| {
+                tracing::info!("connection accepted");
+
+                spawn_server(
+                    TokioIo::new(stream),
+                    client_addr.ip().to_string(),
+                    settings.clone(),
+                );
+            });
         },
     }
 }
@@ -79,67 +98,92 @@ fn spawn_server(
     client_addr: String,
     settings: Arc<Settings>,
 ) {
-    tokio::task::spawn(async move {
-        if let Err(e) =
-            hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
-                .serve_connection(
-                    io_stream,
-                    service_fn(move |req| {
-                        handle(req, client_addr.clone(), settings.clone())
-                    }),
-                )
-                .await
-        {
-            tracing::error! { %e, "failed to serve connection" };
+    let span = tracing::Span::current();
+
+    tokio::task::spawn(
+        async move {
+            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
+                TokioExecutor::new(),
+            )
+            .serve_connection(
+                io_stream,
+                service_fn(move |req| {
+                    handle(req, client_addr.clone(), settings.clone())
+                }),
+            )
+            .await
+            {
+                tracing::error!(%e, "failed to handle request");
+            }
         }
-    });
+        .instrument(span),
+    );
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all, fields(method = %req.method(), path = %req.uri().path()))]
 async fn handle(
     req: Request<Incoming>,
     client_addr: String,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     let Some(proxy) = get_proxy(req.uri().path(), &settings.proxies) else {
+        tracing::warn!("no proxy configured for path");
+
         return Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body(
                 http_body_util::Empty::<hyper::body::Bytes>::new()
                     .map_err(|e| match e {})
                     .boxed(),
-            )
-            .unwrap());
+            )?);
     };
 
-    let stream = TcpStream::connect(&proxy.remote_addr).await?;
+    let stream =
+        TcpStream::connect(&proxy.remote_addr)
+            .await
+            .inspect_err(|e| {
+                tracing::error!(%e, "failed to connect to upstream");
+            })?;
 
     let io = hyper_util::rt::TokioIo::new(stream);
 
     let (mut client, connection) = hyper::client::conn::http1::Builder::new()
         .handshake(io)
-        .await?;
+        .await
+        .inspect_err(|e| {
+            tracing::error!(%e, "failed to complete handshake");
+        })?;
 
-    tokio::task::spawn(async move {
-        if let Err(e) = connection.await {
-            tracing::error! { %e, "failed to establish connection" };
+    tokio::task::spawn(
+        async move {
+            if let Err(e) = connection.await {
+                tracing::error!(%e, "failed to establish connection");
+            }
         }
-    });
+        .in_current_span(),
+    );
 
     let request_uri = req.uri().clone();
     let request_method = req.method().clone();
 
-    let proxy_request = build_request(req, &client_addr, proxy)?;
+    let proxy_request =
+        build_request(req, &client_addr, proxy).inspect_err(|e| {
+            tracing::error!(%e, "failed to build request");
+        })?;
 
     let proxy_uri = proxy_request.uri().clone();
 
-    let res = client.send_request(proxy_request).await?;
-    let status = res.status().as_u16();
-    let request_path = request_uri.path();
-    let remote_port = proxy.remote_port;
-    let proxy_path = proxy_uri.path();
+    let res = client.send_request(proxy_request).await.inspect_err(|e| {
+        tracing::error!(%e, "failed to send request");
+    })?;
 
-    tracing::info! { %status, %request_method, %request_path, %remote_port, %proxy_path };
+    tracing::info!(
+        status = %res.status(),
+        %request_method,
+        request_path = request_uri.path(),
+        remote_port = %proxy.remote_port,
+        proxy_path = %proxy_uri.path(),
+    );
 
     Ok(res.map(|b| b.boxed()))
 }
@@ -161,7 +205,7 @@ pub fn build_request(
 
 fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
     headers.remove(header::CONNECTION);
-    headers.remove(HeaderName::from_static("keep-alive"));
+    headers.remove(&*KEEP_ALIVE_HEADER_NAME);
     headers.remove(header::PROXY_AUTHENTICATE);
     headers.remove(header::PROXY_AUTHORIZATION);
     headers.remove(header::TE);

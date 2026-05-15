@@ -17,7 +17,9 @@ async fn main() -> Result<(), Error> {
     let settings = Arc::new(get_settings(std::env::args_os().collect())?);
 
     let bind_addr = format!("{}:{}", settings.host, settings.local_port);
-    let listener = Arc::new(TcpListener::bind(bind_addr).await?);
 
-    start(listener.clone(), settings.clone()).await
+    let listener = Arc::new(TcpListener::bind(&bind_addr).await?);
+    tracing::info!("listening on {bind_addr}");
+
+    start(listener, settings).await
 }
