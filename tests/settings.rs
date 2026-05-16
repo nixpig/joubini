@@ -185,13 +185,28 @@ fn test_parse_settings_from_config_file_without_optional_fields()
 }
 
 #[test]
-fn test_fail_parsing_empty_config_file() -> Result<(), Box<dyn Error>> {
+fn test_parse_empty_config_file() -> Result<(), Box<dyn Error>> {
     let config_file = PathBuf::from_str("tests/empty-config.yml")?;
 
     let settings = get_settings(vec![
         OsString::from(""),
         OsString::from(format!("--config={}", config_file.display())),
     ]);
+
+    assert!(settings.is_err());
+
+    Ok(())
+}
+
+#[test]
+fn test_tls_missing_pem() -> Result<(), Box<dyn Error>> {
+    let cli_args = vec![
+        OsString::from(""),
+        OsString::from("--tls"),
+        OsString::from("--key=/tmp/localhost.key"),
+    ];
+
+    let settings = get_settings(cli_args);
 
     assert!(settings.is_err());
 
@@ -229,7 +244,7 @@ fn test_fail_invalid_port() -> Result<(), Box<dyn Error>> {
 fn test_missing_config_file() -> Result<(), Box<dyn Error>> {
     let settings = get_settings(vec![
         OsString::from(""),
-        OsString::from(format!("--config={}", "tests/missing.yml")),
+        OsString::from("--config=tests/missing.yml"),
     ]);
 
     let err = settings.unwrap_err().to_string();
@@ -276,12 +291,13 @@ fn test_get_settings_without_config_file() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_cli_host_overrides_config_file_host_in_proxy_remote_addr()
--> Result<(), Box<dyn Error>> {
+fn test_cli_overrides_config_file() -> Result<(), Box<dyn Error>> {
     let cli_args = vec![
         OsString::from("joubini"),
         OsString::from("--config=tests/config.yml"),
         OsString::from("--host=127.0.0.1"),
+        OsString::from("--pem=override/localhost.pem"),
+        OsString::from("--key=override/localhost.key"),
     ];
 
     let settings = get_settings(cli_args)?;
@@ -289,6 +305,81 @@ fn test_cli_host_overrides_config_file_host_in_proxy_remote_addr()
     for p in &settings.proxies {
         assert!(p.remote_addr.starts_with("127.0.0.1:"));
     }
+
+    let tls = settings.tls.unwrap();
+
+    assert_eq!(tls.pem, "override/localhost.pem".to_string());
+    assert_eq!(tls.private_key, "override/localhost.key".to_string());
+
+    Ok(())
+}
+
+#[test]
+fn test_cli_proxies_merge_config_file_proxies() -> Result<(), Box<dyn Error>> {
+    let settings_file_path = PathBuf::from("tests/config.yml");
+
+    let settings = get_settings(vec![
+        OsString::from(""),
+        OsString::from(format!("--config={}", settings_file_path.display())),
+        OsString::from("--proxy=api/v2:3000/v2"),
+        OsString::from("--proxy=api/v3:3000/v3"),
+    ]);
+
+    assert_eq!(
+        settings.unwrap(),
+        Settings {
+            host: String::from("localhost"),
+            local_port: 7878,
+            tls: Some(TlsConfig {
+                pem: PathBuf::from("/tmp/localhost.crt"),
+                private_key: PathBuf::from("/tmp/localhost.key"),
+            }),
+            proxies: vec![
+                Proxy {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/api"),
+                    remote_port: 3000,
+                    remote_path: String::from("/api"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/local/v1"),
+                    remote_port: 3000,
+                    remote_path: String::from("/remote/v1"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/api/v2"),
+                    remote_port: 3000,
+                    remote_path: String::from("/v2"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+                Proxy {
+                    local_path: String::from("/api/v3"),
+                    remote_port: 3000,
+                    remote_path: String::from("/v3"),
+                    remote_addr: String::from("localhost:3000"),
+                },
+            ]
+        }
+    );
 
     Ok(())
 }

@@ -90,7 +90,7 @@ pub fn get_settings(cli_args: Vec<OsString>) -> Result<Settings, Error> {
     let local_port = cli_config
         .local_port
         .or(file_config.local_port)
-        .unwrap_or(80);
+        .unwrap_or(if cli_config.tls { 443 } else { 80 });
 
     let tls = cli_config.tls || file_config.tls.unwrap_or(false);
     let pem = cli_config.pem.or(file_config.pem);
