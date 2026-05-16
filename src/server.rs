@@ -1,4 +1,4 @@
-use crate::settings::{ProxyConfig, Settings};
+use crate::settings::{Proxy, Settings};
 use anyhow::{Error, Result, anyhow};
 use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::header;
@@ -34,23 +34,19 @@ pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
-    match settings.tls {
-        true => {
-            // If tls is true, then pem and key should be set.
-            // TODO: Validate this when building settings so that unwrap here is safe.
-            let pem = settings.pem.as_ref().unwrap();
-            let key = settings.key.as_ref().unwrap();
-
+    match settings.tls.as_ref() {
+        Some(tls) => {
             let certs: Vec<CertificateDer<'static>> =
-                CertificateDer::pem_file_iter(pem)?
+                CertificateDer::pem_file_iter(&tls.pem)?
                     .collect::<Result<Vec<_>, _>>()?;
 
-            let private_key = PrivateKeyDer::from_pem_file(key)?;
+            let private_key = PrivateKeyDer::from_pem_file(&tls.private_key)?;
 
-            let config = ServerConfig::builder()
-                .with_no_client_auth()
-                .with_single_cert(certs, private_key)?;
-            let config = Arc::new(config);
+            let config = Arc::new(
+                ServerConfig::builder()
+                    .with_no_client_auth()
+                    .with_single_cert(certs, private_key)?,
+            );
 
             let tls_acceptor = TlsAcceptor::from(config);
 
@@ -74,7 +70,7 @@ pub async fn start(
                 }
             }
         }
-        false => loop {
+        None => loop {
             let (stream, client_addr) = listener.accept().await?;
             let span = tracing::info_span!("connection", %client_addr);
 
@@ -88,7 +84,7 @@ pub async fn start(
                 );
             });
         },
-    }
+    };
 }
 
 fn spawn_server(
@@ -189,7 +185,7 @@ async fn handle(
 pub fn build_request(
     mut req: Request<Incoming>,
     client_addr: &str,
-    proxy: &ProxyConfig,
+    proxy: &Proxy,
 ) -> Result<Request<Incoming>, Error> {
     strip_hop_by_hop_headers(req.headers_mut());
     add_x_forwarded_for_header(req.headers_mut(), client_addr);
@@ -225,7 +221,7 @@ fn add_x_forwarded_for_header(headers: &mut HeaderMap, client_addr: &str) {
                 .get()
                 .to_str()
                 .map(|existing| format!("{existing}, {client_addr}"))
-                .unwrap_or_else(|_| client_addr.to_string());
+                .unwrap_or(client_addr.to_string());
 
             v.insert(
                 HeaderValue::from_str(&combined)
@@ -242,10 +238,7 @@ fn add_host_header(headers: &mut HeaderMap, remote_addr: &str) {
     headers.insert(&*HOST_HEADER_NAME, host);
 }
 
-fn get_proxy<'a>(
-    req_path: &str,
-    proxies: &'a [ProxyConfig],
-) -> Option<&'a ProxyConfig> {
+fn get_proxy<'a>(req_path: &str, proxies: &'a [Proxy]) -> Option<&'a Proxy> {
     let req_segments = req_path
         .split('/')
         .filter(|p| !p.is_empty())
@@ -261,7 +254,7 @@ fn get_proxy<'a>(
     })
 }
 
-pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
+pub fn map_proxy_uri(req_uri: &Uri, proxy: &Proxy) -> Result<Uri, Error> {
     let local_path = proxy.local_path.trim_end_matches('/');
     let remote_path = proxy.remote_path.trim_end_matches('/');
 
@@ -278,7 +271,7 @@ pub fn map_proxy_uri(req_uri: &Uri, proxy: &ProxyConfig) -> Result<Uri, Error> {
                 path
             }
         })
-        .unwrap_or_else(|| format!("{}/", remote_path))
+        .unwrap_or(format!("{}/", remote_path))
         .parse::<Uri>()
         .map_err(|e| anyhow!(e))
 }

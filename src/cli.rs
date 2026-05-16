@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[clap(
     author = "@nixpig",
     version = env!("CARGO_PKG_VERSION"),
-    about = "A super-simple and minimally configurable HTTP reverse proxy for local development with support for HTTP/1.1, HTTP/2, TLS/SSL and web sockets."
+    about = "A super-simple and minimally configurable HTTP reverse proxy for local development."
 )]
 pub struct Cli {
     #[clap(short = 'H', long = "host", name = "host", help = "Hostname or IP")]
@@ -34,12 +34,7 @@ pub struct Cli {
     )]
     pub config: Option<PathBuf>,
 
-    #[clap(
-        short = 'T',
-        long = "tls",
-        default_value = "false",
-        help = "Serve over TLS"
-    )]
+    #[clap(short = 'T', long = "tls", help = "Serve over TLS", action = clap::ArgAction::SetTrue)]
     pub tls: bool,
 
     #[clap(

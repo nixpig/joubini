@@ -2,7 +2,7 @@ use actix_web::http::header::{self, HeaderMap};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, web};
 use hyper::Uri;
 use joubini::server::start;
-use joubini::settings::{ProxyConfig, Settings};
+use joubini::settings::{Proxy, Settings, TlsConfig};
 use reqwest::StatusCode;
 use serial_test::serial;
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ struct FormData {
 
 #[test]
 fn test_map_proxy_uri() -> Result<(), Box<dyn Error>> {
-    let proxy = ProxyConfig::new("foo:3000/baz", "localhost")?;
+    let proxy = Proxy::new("foo:3000/baz", "localhost")?;
 
     let req_uri = Uri::from_static("/foo/bar");
     let mapped_uri = joubini::server::map_proxy_uri(&req_uri, &proxy)?;
@@ -53,14 +53,10 @@ fn test_map_proxy_uri() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
-        proxies: vec![ProxyConfig::new(":3015", "localhost").unwrap()],
+        tls: None,
+        proxies: vec![Proxy::new(":3015", "localhost").unwrap()],
     };
 
     start_remote(3015, "/").await;
@@ -91,14 +87,10 @@ async fn test_headers_updated() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_fail_when_no_remote_server() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
-        proxies: vec![ProxyConfig::new(":3011", "localhost").unwrap()],
+        tls: None,
+        proxies: vec![Proxy::new(":3011", "localhost").unwrap()],
     };
 
     start_joubini(settings).await;
@@ -116,13 +108,9 @@ async fn test_fail_when_no_remote_server() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_fail_when_no_proxy_specified() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
         proxies: vec![],
     };
 
@@ -141,14 +129,10 @@ async fn test_fail_when_no_proxy_specified() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_post_json() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
-        proxies: vec![ProxyConfig::new(":3009", "localhost").unwrap()],
+        tls: None,
+        proxies: vec![Proxy::new(":3009", "localhost").unwrap()],
     };
 
     start_remote(3009, "/").await;
@@ -187,14 +171,10 @@ async fn test_post_json() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_post_form() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
-        proxies: vec![ProxyConfig::new(":3010", "localhost").unwrap()],
+        tls: None,
+        proxies: vec![Proxy::new(":3010", "localhost").unwrap()],
     };
 
     start_remote(3010, "/").await;
@@ -232,14 +212,10 @@ async fn test_post_form() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
-        proxies: vec![ProxyConfig::new(":3000", "localhost").unwrap()],
+        tls: None,
+        proxies: vec![Proxy::new(":3000", "localhost").unwrap()],
     };
 
     start_remote(3000, "/").await;
@@ -262,15 +238,12 @@ async fn test_only_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("foo:3001", "localhost")
+            Proxy::new("foo:3001", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -300,15 +273,12 @@ async fn test_path_to_port_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("bar:3002/bar", "localhost")
+            Proxy::new("bar:3002/bar", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -338,15 +308,12 @@ async fn test_path_to_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("baz:3003/qux", "localhost")
+            Proxy::new("baz:3003/qux", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -376,15 +343,12 @@ async fn test_rename_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("foo:3004/bar/baz/qux", "localhost")
+            Proxy::new("foo:3004/bar/baz/qux", "localhost")
                 .expect("Unable to parse proxy config from string"),
         ],
     };
@@ -414,15 +378,12 @@ async fn test_shallow_to_deep_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("foo/bar/baz:3005/qux", "localhost")
+            Proxy::new("foo/bar/baz:3005/qux", "localhost")
                 .expect("Unable to parse proxy settings from provided string"),
         ],
     };
@@ -452,19 +413,16 @@ async fn test_deep_to_shallow_path_mapping() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new("foo:3008/fred", "localhost")
+            Proxy::new("foo:3008/fred", "localhost")
                 .expect("unable to parse proxy string"),
-            ProxyConfig::new("foo/qux:3007/thud", "localhost")
+            Proxy::new("foo/qux:3007/thud", "localhost")
                 .expect("unable to parse proxy string"),
-            ProxyConfig::new("foo/bar:3006/baz", "localhost")
+            Proxy::new("foo/bar:3006/baz", "localhost")
                 .expect("unable to parse proxy string"),
         ],
     };
@@ -520,15 +478,12 @@ async fn test_nested_matching_path_mappings() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_add_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new(":3012", "localhost")
+            Proxy::new(":3012", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -549,15 +504,12 @@ async fn test_add_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
+
         proxies: vec![
-            ProxyConfig::new(":3013", "localhost")
+            Proxy::new(":3013", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -583,15 +535,11 @@ async fn test_append_x_forwarded_for_header() -> Result<(), Box<dyn Error>> {
 #[tokio::test]
 async fn test_response_codes() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
-        config: None,
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        tls: false,
-        pem: None,
-        key: None,
+        tls: None,
         proxies: vec![
-            ProxyConfig::new(":3014", "localhost")
+            Proxy::new(":3014", "localhost")
                 .expect("Unable to parse proxy string"),
         ],
     };
@@ -635,12 +583,11 @@ async fn test_tls_server() -> Result<(), Box<dyn Error>> {
     let settings = Settings {
         host: String::from("localhost"),
         local_port: 7878,
-        local_addr: String::from("localhost:7878"),
-        proxies: vec![ProxyConfig::new(":3016", "localhost").unwrap()],
-        config: None,
-        tls: true,
-        pem: Some(PathBuf::from_str("/tmp/localhost.crt").unwrap()),
-        key: Some(PathBuf::from_str("/tmp/localhost.key").unwrap()),
+        proxies: vec![Proxy::new(":3016", "localhost").unwrap()],
+        tls: Some(TlsConfig {
+            pem: PathBuf::from_str("/tmp/localhost.crt").unwrap(),
+            private_key: PathBuf::from_str("/tmp/localhost.key").unwrap(),
+        }),
     };
 
     start_remote(3016, "/").await;
