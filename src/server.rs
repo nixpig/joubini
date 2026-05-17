@@ -35,8 +35,6 @@ pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
-    let id = Uuid::new_v4().to_string();
-
     match settings.tls.as_ref() {
         Some(tls) => {
             let certs: Vec<CertificateDer<'static>> =
@@ -54,8 +52,10 @@ pub async fn start(
             let tls_acceptor = TlsAcceptor::from(config);
 
             loop {
+                let id = Uuid::new_v4().to_string();
+
                 let (stream, client_addr) = listener.accept().await?;
-                let span = tracing::info_span!("connection", %id);
+                let span = tracing::info_span!("request", %client_addr, %id);
 
                 match tls_acceptor.accept(stream).await {
                     Ok(tls_stream) => span.in_scope(|| {
@@ -74,8 +74,10 @@ pub async fn start(
             }
         }
         None => loop {
+            let id = Uuid::new_v4().to_string();
+
             let (stream, client_addr) = listener.accept().await?;
-            let span = tracing::info_span!("connection", %id);
+            let span = tracing::info_span!("request", %client_addr, %id);
 
             span.in_scope(|| {
                 tracing::info!("accepted");
@@ -123,7 +125,7 @@ async fn handle(
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     let Some(proxy) = get_proxy(req.uri().path(), &settings.proxies) else {
-        tracing::warn!(path = req.uri().path(), "no proxy configured for path");
+        tracing::warn!(path = req.uri().path(), "no proxy matches");
 
         return Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
@@ -179,6 +181,7 @@ async fn handle(
         request_path = request_uri.path(),
         remote_addr = %proxy.remote_addr,
         proxy_path = %proxy_uri.path(),
+        "completed",
     );
 
     Ok(res.map(|b| b.boxed()))
