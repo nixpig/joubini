@@ -53,14 +53,12 @@ pub async fn start(
 
             loop {
                 let id = Uuid::new_v4().to_string();
+                let span = tracing::info_span!("request", %id);
 
                 let (stream, client_addr) = listener.accept().await?;
-                let span = tracing::info_span!("request", %client_addr, %id);
 
                 match tls_acceptor.accept(stream).await {
                     Ok(tls_stream) => span.in_scope(|| {
-                        tracing::info!("accepted");
-
                         spawn_server(
                             TokioIo::new(tls_stream),
                             client_addr.ip().to_string(),
@@ -69,24 +67,22 @@ pub async fn start(
                     }),
                     Err(e) => span.in_scope(|| {
                         tracing::error!(%e, "failed to complete TLS handshake")
-                    })
+                    }),
                 }
             }
         }
         None => loop {
             let id = Uuid::new_v4().to_string();
+            let span = tracing::info_span!("request", %id);
 
             let (stream, client_addr) = listener.accept().await?;
-            let span = tracing::info_span!("request", %client_addr, %id);
 
             span.in_scope(|| {
-                tracing::info!("accepted");
-
                 spawn_server(
                     TokioIo::new(stream),
                     client_addr.ip().to_string(),
                     Arc::clone(&settings),
-                );
+                )
             });
         },
     };
@@ -101,19 +97,14 @@ fn spawn_server(
 
     tokio::task::spawn(
         async move {
-            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
-                TokioExecutor::new(),
-            )
-            .serve_connection(
-                io_stream,
-                service_fn(move |req| {
-                    handle(req, client_addr.clone(), Arc::clone(&settings))
-                }),
-            )
-            .await
-            {
-                tracing::error!(%e, "failed to handle request");
-            }
+            hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
+                .serve_connection(
+                    io_stream,
+                    service_fn(move |req| {
+                        handle(req, client_addr.clone(), Arc::clone(&settings))
+                    }),
+                )
+                .await
         }
         .instrument(span),
     );
@@ -154,9 +145,7 @@ async fn handle(
 
     tokio::task::spawn(
         async move {
-            if let Err(e) = connection.await {
-                tracing::error!(%e, "failed to establish connection");
-            }
+            let _ = connection.await;
         }
         .in_current_span(),
     );
@@ -164,10 +153,7 @@ async fn handle(
     let request_uri = req.uri().clone();
     let request_method = req.method().clone();
 
-    let proxy_request =
-        build_request(req, &client_addr, proxy).inspect_err(|e| {
-            tracing::error!(%e, "failed to build request");
-        })?;
+    let proxy_request = build_request(req, &client_addr, proxy)?;
 
     let proxy_uri = proxy_request.uri().clone();
 
@@ -176,11 +162,11 @@ async fn handle(
     })?;
 
     tracing::info!(
-        status = %res.status(),
-        %request_method,
-        request_path = request_uri.path(),
+        status = %res.status().as_u16(),
+        method = %request_method,
+        request_path = %request_uri,
         remote_addr = %proxy.remote_addr,
-        proxy_path = %proxy_uri.path(),
+        remote_path = %proxy_uri.path(),
         "completed",
     );
 
