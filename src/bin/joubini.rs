@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let subscriber = tracing_subscriber::fmt()
-        .with_thread_ids(true)
+        .with_target(false)
         .with_level(true)
         .compact()
         .finish();

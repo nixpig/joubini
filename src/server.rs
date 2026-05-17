@@ -20,6 +20,7 @@ use std::sync::LazyLock;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsAcceptor;
 use tracing::Instrument;
+use uuid::Uuid;
 
 static HOST_HEADER_NAME: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("host"));
@@ -34,6 +35,8 @@ pub async fn start(
     listener: Arc<TcpListener>,
     settings: Arc<Settings>,
 ) -> Result<(), Error> {
+    let id = Uuid::new_v4().to_string();
+
     match settings.tls.as_ref() {
         Some(tls) => {
             let certs: Vec<CertificateDer<'static>> =
@@ -52,11 +55,11 @@ pub async fn start(
 
             loop {
                 let (stream, client_addr) = listener.accept().await?;
-                let span = tracing::info_span!("connection", %client_addr);
+                let span = tracing::info_span!("connection", %id);
 
                 match tls_acceptor.accept(stream).await {
                     Ok(tls_stream) => span.in_scope(|| {
-                        tracing::info!("connection accepted");
+                        tracing::info!("accepted");
 
                         spawn_server(
                             TokioIo::new(tls_stream),
@@ -72,10 +75,10 @@ pub async fn start(
         }
         None => loop {
             let (stream, client_addr) = listener.accept().await?;
-            let span = tracing::info_span!("connection", %client_addr);
+            let span = tracing::info_span!("connection", %id);
 
             span.in_scope(|| {
-                tracing::info!("connection accepted");
+                tracing::info!("accepted");
 
                 spawn_server(
                     TokioIo::new(stream),
@@ -114,14 +117,13 @@ fn spawn_server(
     );
 }
 
-#[tracing::instrument(skip_all, fields(method = %req.method(), path = %req.uri().path()))]
 async fn handle(
     req: Request<Incoming>,
     client_addr: String,
     settings: Arc<Settings>,
 ) -> Result<Response<BoxBody<hyper::body::Bytes, hyper::Error>>, Error> {
     let Some(proxy) = get_proxy(req.uri().path(), &settings.proxies) else {
-        tracing::warn!("no proxy configured for path");
+        tracing::warn!(path = req.uri().path(), "no proxy configured for path");
 
         return Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
@@ -261,23 +263,29 @@ fn get_proxy<'a>(req_path: &str, proxies: &'a [Proxy]) -> Option<&'a Proxy> {
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &Proxy) -> Result<Uri, Error> {
-    let local_path = proxy.local_path.trim_end_matches('/');
     let remote_path = proxy.remote_path.trim_end_matches('/');
 
-    req_uri
-        .path_and_query()
-        .map(|pq| pq.as_str())
-        .unwrap_or("/")
-        .strip_prefix(local_path)
-        .map(|rest| {
-            let path = format!("{}{}", remote_path, rest);
-            if path.is_empty() {
-                "/".to_string()
-            } else {
-                path
-            }
-        })
-        .expect("should match prefix guaranteed by get_proxy")
-        .parse::<Uri>()
-        .map_err(|e| anyhow!(e))
+    let remaining = req_uri
+        .path()
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .skip(proxy.normalised_local_path.len())
+        .collect::<Vec<_>>()
+        .join("/");
+
+    let query = req_uri.query().map(|q| format!("?{q}")).unwrap_or_default();
+
+    let path = if remaining.is_empty() {
+        format!("{remote_path}{query}")
+    } else {
+        format!("{remote_path}/{remaining}{query}")
+    };
+
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+
+    path.parse::<Uri>().map_err(|e| anyhow!(e))
 }
