@@ -61,7 +61,7 @@ pub async fn start(
                         spawn_server(
                             TokioIo::new(tls_stream),
                             client_addr.ip().to_string(),
-                            settings.clone(),
+                            Arc::clone(&settings),
                         )
                     }),
                     Err(e) => span.in_scope(|| {
@@ -80,7 +80,7 @@ pub async fn start(
                 spawn_server(
                     TokioIo::new(stream),
                     client_addr.ip().to_string(),
-                    settings.clone(),
+                    Arc::clone(&settings),
                 );
             });
         },
@@ -102,7 +102,7 @@ fn spawn_server(
             .serve_connection(
                 io_stream,
                 service_fn(move |req| {
-                    handle(req, client_addr.clone(), settings.clone())
+                    handle(req, client_addr.clone(), Arc::clone(&settings))
                 }),
             )
             .await
@@ -175,7 +175,7 @@ async fn handle(
         status = %res.status(),
         %request_method,
         request_path = request_uri.path(),
-        remote_port = %proxy.remote_port,
+        remote_addr = %proxy.remote_addr,
         proxy_path = %proxy_uri.path(),
     );
 
@@ -198,6 +198,16 @@ pub fn build_request(
 }
 
 fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
+    let connection_headers: Vec<String> = headers
+        .get(header::CONNECTION)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.split(',').map(|h| h.trim().to_owned()).collect())
+        .unwrap_or_default();
+
+    connection_headers.iter().for_each(|h| {
+        headers.remove(h);
+    });
+
     headers.remove(header::CONNECTION);
     headers.remove(&*KEEP_ALIVE_HEADER_NAME);
     headers.remove(header::PROXY_AUTHENTICATE);
@@ -242,16 +252,12 @@ fn get_proxy<'a>(req_path: &str, proxies: &'a [Proxy]) -> Option<&'a Proxy> {
     let req_segments = req_path
         .split('/')
         .filter(|p| !p.is_empty())
-        .collect::<Vec<&str>>();
+        .map(str::to_owned)
+        .collect::<Vec<String>>();
 
-    proxies.iter().rfind(|p| {
-        req_segments.starts_with(
-            &p.local_path
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<&str>>(),
-        )
-    })
+    proxies
+        .iter()
+        .rfind(|p| req_segments.starts_with(&p.normalised_local_path))
 }
 
 pub fn map_proxy_uri(req_uri: &Uri, proxy: &Proxy) -> Result<Uri, Error> {
@@ -271,7 +277,7 @@ pub fn map_proxy_uri(req_uri: &Uri, proxy: &Proxy) -> Result<Uri, Error> {
                 path
             }
         })
-        .unwrap_or(format!("{}/", remote_path))
+        .expect("should match prefix guaranteed by get_proxy")
         .parse::<Uri>()
         .map_err(|e| anyhow!(e))
 }
