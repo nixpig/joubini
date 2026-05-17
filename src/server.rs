@@ -262,19 +262,15 @@ pub fn map_proxy_uri(req_uri: &Uri, proxy: &Proxy) -> Result<Uri, Error> {
         .collect::<Vec<_>>()
         .join("/");
 
-    let query = req_uri.query().map(|q| format!("?{q}")).unwrap_or_default();
+    let path = format!("{remote_path}/{remaining}")
+        .trim_matches('/')
+        .to_string();
+    let path = format!("/{path}");
 
-    let path = if remaining.is_empty() {
-        format!("{remote_path}{query}")
-    } else {
-        format!("{remote_path}/{remaining}{query}")
+    let mut builder = Uri::builder().path_and_query(&path);
+    if let Some(q) = req_uri.query() {
+        builder = builder.path_and_query(format!("{path}?{q}"));
     };
 
-    let path = if path.is_empty() {
-        "/".to_string()
-    } else {
-        path
-    };
-
-    path.parse::<Uri>().map_err(|e| anyhow!(e))
+    builder.build().map_err(|e| anyhow!(e))
 }
